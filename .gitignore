@@ -1,0 +1,54 @@
+# Ambientes virtuais e dependencias instaladas localmente
+.venv/
+venv/
+env/
+ENV/
+
+# Cache e artefatos do Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Configuracoes locais, credenciais e segredos
+.env
+.env.*
+!.env.example
+*.local.toml
+tools/config.toml
+.claude/settings.local.json
+
+# Audios/videos de entrada e transcricoes geradas
+/inbox/*
+!/inbox/.gitkeep
+/output/*
+!/output/.gitkeep
+
+# Modelos e caches locais do Whisper / Hugging Face
+/.cache/
+/models/
+/model/
+/huggingface/
+/whisper/
+
+# Arquivos temporarios, logs e crash dumps
+*.log
+*.tmp
+*.temp
+*.stackdump
+
+# Editores e sistema operacional
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
