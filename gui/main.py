@@ -86,17 +86,17 @@ class TranscritorGUI(ctk.CTk):
 
         # Grupo de Controles
         c1 = ctk.CTkFrame(self.frames["single"], fg_color="transparent")
-        c1.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
-        c1.grid_columnconfigure((0,1,2), weight=1)
+        c1.grid(row=2, column=0, padx=20, pady=10, sticky="w")
+        # Removido grid_columnconfigure para que os botões não expandam com a tela
 
         self.btn_run_single = ctk.CTkButton(c1, text="Iniciar Transcrição", height=35, command=self.run_single, fg_color="#0066CC", hover_color="#005BB5")
-        self.btn_run_single.grid(row=0, column=0, padx=(0,5), sticky="ew")
+        self.btn_run_single.grid(row=0, column=0, padx=(0,5), sticky="w")
         
         self.btn_pause_single = ctk.CTkButton(c1, text="Pausar", height=35, command=self.toggle_pause, state="disabled", fg_color="#3A3A3C", hover_color="#4A4A4C")
-        self.btn_pause_single.grid(row=0, column=1, padx=5, sticky="ew")
+        self.btn_pause_single.grid(row=0, column=1, padx=5, sticky="w")
         
         self.btn_stop_single = ctk.CTkButton(c1, text="Parar", height=35, command=self.stop_process, state="disabled", fg_color="#3A3A3C", hover_color="#4A4A4C")
-        self.btn_stop_single.grid(row=0, column=2, padx=(5,0), sticky="ew")
+        self.btn_stop_single.grid(row=0, column=2, padx=(5,0), sticky="w")
 
         # Progresso
         self.prog_single = ctk.CTkProgressBar(self.frames["single"], height=10, progress_color="#007AFF", fg_color="#2C2C2E")
@@ -133,17 +133,16 @@ class TranscritorGUI(ctk.CTk):
 
         # Botões de controle Batch
         c2 = ctk.CTkFrame(self.frames["batch"], fg_color="transparent")
-        c2.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
-        c2.grid_columnconfigure((0,1,2), weight=1)
+        c2.grid(row=2, column=0, padx=20, pady=10, sticky="w")
 
         self.btn_run_batch = ctk.CTkButton(c2, text="Processar Fila", height=35, command=self.run_batch, fg_color="#0066CC", hover_color="#005BB5")
-        self.btn_run_batch.grid(row=0, column=0, padx=(0,5), sticky="ew")
+        self.btn_run_batch.grid(row=0, column=0, padx=(0,5), sticky="w")
         
         self.btn_pause_batch = ctk.CTkButton(c2, text="Pausar", height=35, command=self.toggle_pause, state="disabled", fg_color="#3A3A3C", hover_color="#4A4A4C")
-        self.btn_pause_batch.grid(row=0, column=1, padx=5, sticky="ew")
+        self.btn_pause_batch.grid(row=0, column=1, padx=5, sticky="w")
         
         self.btn_stop_batch = ctk.CTkButton(c2, text="Parar", height=35, command=self.stop_process, state="disabled", fg_color="#3A3A3C", hover_color="#4A4A4C")
-        self.btn_stop_batch.grid(row=0, column=2, padx=(5,0), sticky="ew")
+        self.btn_stop_batch.grid(row=0, column=2, padx=(5,0), sticky="w")
 
         self.prog_batch = ctk.CTkProgressBar(self.frames["batch"], height=10, progress_color="#007AFF", fg_color="#2C2C2E")
         self.prog_batch.grid(row=3, column=0, padx=20, pady=(15, 5), sticky="ew")
