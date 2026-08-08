@@ -78,10 +78,13 @@ class SimpleTranscribeGUI(ctk.CTk):
 
         # Grupo de Seleção
         g1 = self.create_group(self.frames["single"], 1)
-        ctk.CTkButton(g1, text="Selecionar Mídia", command=self.browse_single_file, width=120, fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=0, column=0, padx=15, pady=15)
+        g1.grid_columnconfigure(0, weight=0)  # Botões não expandem
+        g1.grid_columnconfigure(1, weight=1)  # Entradas de texto expandem
+        
+        ctk.CTkButton(g1, text="Selecionar Mídia", command=self.browse_single_file, width=120, fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=0, column=0, padx=15, pady=15, sticky="w")
         ctk.CTkEntry(g1, textvariable=self.single_file_path, state="disabled", fg_color="transparent", border_width=0, text_color="gray80").grid(row=0, column=1, sticky="ew", padx=(0,15))
         
-        ctk.CTkButton(g1, text="Salvar Em", command=self.browse_single_out, width=120, fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=1, column=0, padx=15, pady=(0,15))
+        ctk.CTkButton(g1, text="Salvar Em", command=self.browse_single_out, width=120, fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=1, column=0, padx=15, pady=(0,15), sticky="w")
         ctk.CTkEntry(g1, textvariable=self.single_out_path, state="disabled", fg_color="transparent", border_width=0, text_color="gray80").grid(row=1, column=1, sticky="ew", padx=(0,15))
 
         # Grupo de Controles
