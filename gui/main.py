@@ -177,8 +177,9 @@ class SimpleTranscribeGUI(ctk.CTk):
         self.model_combo = ctk.CTkComboBox(g3, values=backend.MODELS, fg_color="#2C2C2E", border_width=0)
         self.model_combo.grid(row=2, column=0, pady=(0,15), padx=15, sticky="w")
         
-        ctk.CTkButton(g3, text="Baixar", command=self.download_model, width=100, fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=2, column=1, padx=10, pady=(0,15))
-        ctk.CTkButton(g3, text="Excluir", command=self.delete_model, width=100, fg_color="transparent", border_width=1, border_color="#4A4A4C").grid(row=2, column=2, pady=(0,15), padx=(0,15))
+        ctk.CTkButton(g3, text="Baixar", command=self.download_model, width=80, fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=2, column=1, padx=(10, 5), pady=(0,15))
+        ctk.CTkButton(g3, text="Excluir", command=self.delete_model, width=80, fg_color="transparent", border_width=1, border_color="#4A4A4C").grid(row=2, column=2, pady=(0,15), padx=5)
+        ctk.CTkButton(g3, text="Definir Padrão", command=self.set_default_model, width=110, fg_color="#0066CC", hover_color="#005BB5").grid(row=2, column=3, pady=(0,15), padx=(5,15))
 
         self.log_models = ctk.CTkTextbox(self.frames["models"], fg_color="#1C1C1E", text_color="gray80", border_width=1, border_color="#2C2C2E", corner_radius=8)
         self.log_models.grid(row=3, column=0, padx=20, pady=(10, 20), sticky="nsew")
@@ -462,9 +463,20 @@ class SimpleTranscribeGUI(ctk.CTk):
     def delete_model(self):
         mod = self.model_combo.get()
         if messagebox.askyesno("Confirmar", f"Excluir '{mod}'?"):
-            success = backend.delete_model(mod)
-            self.log_models.insert("end", f"\n{mod} excluído.\n" if success else f"\nFalha. {mod} não encontrado.\n")
-            self.refresh_models()
+            self.log_models.insert("end", f"\nExcluindo modelo {mod}...\n")
+            try:
+                success = backend.delete_model(mod)
+                self.log_models.insert("end", f"Modelo {mod} excluído com sucesso!\n" if success else f"Modelo {mod} não encontrado.\n")
+                self.refresh_models()
+            except Exception as e:
+                self.log_models.insert("end", f"Erro ao excluir modelo: {e}\n")
+
+    def set_default_model(self):
+        model_size = self.model_combo.get()
+        self.cfg_model.set(model_size)
+        self.save_settings()
+        self.log_models.insert("end", f"\nModelo '{model_size}' definido como padrão com sucesso!\n")
+        self.log_models.see("end")
 
     def load_settings(self):
         if CONFIG_PATH.exists():
