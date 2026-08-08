@@ -15,6 +15,17 @@ Funciona em lote com todos os arquivos de `inbox/` ou com um arquivo indicado na
 linha de comando. Os formatos aceitos incluem MP3, MP4, M4A, WAV, OGG, FLAC, AAC,
 WebM, MKV e MOV.
 
+## Interface para macOS (Simple Transcribe)
+
+O projeto agora possui uma interface gráfica nativa para macOS, super rápida e elegante, utilizando `WhisperKit` e a aceleração Neural Engine da Apple.
+Ela possui suporte a múltiplos idiomas e processamento em lote.
+
+![Tela Única](assets/screen_single.png)
+![Fila em Lote](assets/screen_batch.png)
+![Sobre o App](assets/screen_about.png)
+
+Você pode baixá-la via Homebrew Cask (veja as instruções abaixo) ou executando o script `./build_app.sh` se quiser compilá-la localmente no Xcode/Swift.
+
 ## Para quem vai instalar pela primeira vez
 
 ### 1. Obtenha o projeto
