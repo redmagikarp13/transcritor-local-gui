@@ -41,7 +41,7 @@ class SimpleTranscribeGUI(ctk.CTk):
         # No macOS a sidebar costuma ser ligeiramente diferente do fundo, com separador sutil
         self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0, fg_color="#252525")
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(5, weight=1)
+        self.sidebar_frame.grid_rowconfigure(6, weight=1)
 
         self.logo_label = ctk.CTkLabel(
             self.sidebar_frame, 
@@ -57,6 +57,7 @@ class SimpleTranscribeGUI(ctk.CTk):
         self.create_sidebar_button("batch", "Fila (Lote)", 2)
         self.create_sidebar_button("models", "Modelos", 3)
         self.create_sidebar_button("settings", "Configurações", 4)
+        self.create_sidebar_button("credits", "Créditos", 5)
 
         # --- ÁREA PRINCIPAL ---
         self.main_container = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
@@ -87,9 +88,16 @@ class SimpleTranscribeGUI(ctk.CTk):
         ctk.CTkButton(g1, text="Salvar Em", command=self.browse_single_out, width=120, fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=1, column=0, padx=15, pady=(0,15), sticky="w")
         ctk.CTkEntry(g1, textvariable=self.single_out_path, state="disabled", fg_color="transparent", border_width=0, text_color="gray80").grid(row=1, column=1, sticky="ew", padx=(0,15))
 
+        # Grupo de Opções (Idioma)
+        self.single_lang = ctk.StringVar(value="auto")
+        opt1 = ctk.CTkFrame(self.frames["single"], fg_color="transparent")
+        opt1.grid(row=2, column=0, padx=20, pady=(0,5), sticky="w")
+        ctk.CTkLabel(opt1, text="Idioma do Áudio:").pack(side="left", padx=(0,10))
+        ctk.CTkComboBox(opt1, variable=self.single_lang, values=["auto", "pt", "en", "es"], width=100, fg_color="#2C2C2E", border_width=0).pack(side="left")
+
         # Grupo de Controles
         c1 = ctk.CTkFrame(self.frames["single"], fg_color="transparent")
-        c1.grid(row=2, column=0, padx=20, pady=10, sticky="w")
+        c1.grid(row=3, column=0, padx=20, pady=10, sticky="w")
         # Removido grid_columnconfigure para que os botões não expandam com a tela
 
         self.btn_run_single = ctk.CTkButton(c1, text="Iniciar Transcrição", height=35, command=self.run_single, fg_color="#0066CC", hover_color="#005BB5")
@@ -103,7 +111,7 @@ class SimpleTranscribeGUI(ctk.CTk):
 
         # Progresso
         self.prog_single = ctk.CTkProgressBar(self.frames["single"], height=10, progress_color="#007AFF", fg_color="#2C2C2E")
-        self.prog_single.grid(row=3, column=0, padx=20, pady=(15, 5), sticky="ew")
+        self.prog_single.grid(row=4, column=0, padx=20, pady=(15, 5), sticky="ew")
         self.prog_single.set(0)
 
         # Log
@@ -201,6 +209,28 @@ class SimpleTranscribeGUI(ctk.CTk):
         ctk.CTkComboBox(g4, variable=self.cfg_compute, values=["int8", "float16", "float32"], fg_color="#2C2C2E", border_width=0).grid(row=3, column=1, padx=20, pady=(0,15), sticky="e")
 
         ctk.CTkButton(self.frames["settings"], text="Salvar Configurações", command=self.save_settings, width=150, height=35, fg_color="#0066CC", hover_color="#005BB5").grid(row=2, column=0, pady=20, padx=20, sticky="sw")
+
+        # === TAB CREDITS ===
+        self.frames["credits"] = self.create_card_frame()
+        self.frames["credits"].grid_rowconfigure(2, weight=1)
+        
+        self.create_header(self.frames["credits"], "Créditos", 0)
+
+        g5 = self.create_group(self.frames["credits"], 1)
+        
+        ctk.CTkLabel(g5, text="Simple Transcribe", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(20, 5))
+        ctk.CTkLabel(g5, text="Uma interface gráfica multiplataforma para o transcritor-local.", text_color="gray70").pack(pady=(0, 20))
+        
+        credits_text = (
+            "Desenvolvido por Leonardo e Marcos Accioly.\n\n"
+            "Tecnologias utilizadas:\n"
+            "- Python & CustomTkinter\n"
+            "- Faster-Whisper (CTranslate2)\n"
+            "- HuggingFace Hub"
+        )
+        ctk.CTkLabel(g5, text=credits_text, justify="center").pack(pady=10)
+        
+        ctk.CTkLabel(g5, text="© 2026", text_color="gray50", font=ctk.CTkFont(size=10)).pack(pady=(20, 10))
 
         # Initialize
         self.select_tab("single")
@@ -305,7 +335,12 @@ class SimpleTranscribeGUI(ctk.CTk):
         self.prog_single.set(0)
         self.is_paused = False
         
-        args = {"files": [file_path], "output_dir": self.single_out_path.get()}
+        lang = self.single_lang.get()
+        config_override = {}
+        if lang != "auto":
+            config_override["language"] = lang
+            
+        args = {"files": [file_path], "output_dir": self.single_out_path.get(), "config": config_override}
         self.start_transcription_thread(args, self.log_single, self.btn_run_single, self.prog_single, self.btn_pause_single, self.btn_stop_single)
 
     # --- Funções Batch ---
