@@ -421,13 +421,13 @@ class SimpleTranscribeGUI(ctk.CTk):
     def handle_progress_line(self, text, log_widget, prog_widget, is_cr):
         def update_log():
             if is_cr:
-                lines = log_widget.get("0.0", "end").split("\n")
-                if len(lines) > 2:
-                    log_widget.delete(f"{len(lines)-2}.0", "end")
-                    log_widget.insert("end", text + "\n")
+                lines = log_widget.get("1.0", "end-1c").split("\n")
+                if len(lines) > 0:
+                    log_widget.delete(f"{len(lines)}.0", "end")
+                log_widget.insert("end", text + "\n")
             else:
                 log_widget.insert("end", text + "\n")
-                log_widget.see("end")
+            log_widget.see("end")
         self.after(0, update_log)
 
         if "-->" in text:
