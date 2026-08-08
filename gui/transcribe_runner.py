@@ -22,6 +22,7 @@ def run_transcription(files, output_dir, config_override=None):
         tr.OUTPUT = Path(output_dir)
 
     print(f"[{len(files)} arquivo(s) na fila para processamento (faster-whisper)]", flush=True)
+    print(f"Carregando modelo '{cfg.get('model')}'... (Se for a primeira vez, o download automático pode demorar vários minutos)", flush=True)
 
     try:
         model = tr.load_model(cfg)
