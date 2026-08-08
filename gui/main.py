@@ -10,14 +10,14 @@ import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import toml
 
-# Adiciona o diretório raiz
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
 import gui.backend as backend
 
-ctk.set_appearance_mode("System")
-ctk.set_default_color_theme("dark-blue")
+# Tema para imitar o estilo nativo do macOS (Clean/Minimalista)
+ctk.set_appearance_mode("Dark")
+ctk.set_default_color_theme("blue")
 
 CONFIG_PATH = ROOT_DIR / "tools" / "config.toml"
 
@@ -25,205 +25,223 @@ class TranscritorGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Transcritor Local (MLX)")
-        self.geometry("900x680")
+        self.title("Transcritor Local")
+        self.geometry("950x650")
+        
+        # O macOS nativo geralmente usa um cinza bem escuro no fundo principal
+        self.configure(fg_color="#1E1E1E")
 
-        # Layout principal
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        # Process control
         self.current_process = None
         self.is_paused = False
 
-        # Barra lateral minimalista
-        self.sidebar_frame = ctk.CTkFrame(self, width=200, corner_radius=0, fg_color="transparent")
-        self.sidebar_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        # --- SIDEBAR ---
+        # No macOS a sidebar costuma ser ligeiramente diferente do fundo, com separador sutil
+        self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0, fg_color="#252525")
+        self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(5, weight=1)
 
-        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="Transcritor MLX", font=ctk.CTkFont(size=20, weight="bold"))
-        self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 30))
+        self.logo_label = ctk.CTkLabel(
+            self.sidebar_frame, 
+            text="Transcritor MLX", 
+            font=ctk.CTkFont(size=18, weight="bold")
+        )
+        self.logo_label.grid(row=0, column=0, padx=20, pady=(30, 20), sticky="w")
 
-        # Estilo dos botões da sidebar
-        btn_kwargs = {"fg_color": "transparent", "text_color": ("gray10", "gray90"), "hover_color": ("gray70", "gray30"), "anchor": "w"}
+        self.tabs = {}
+        self.tab_buttons = {}
 
-        self.btn_tab_single = ctk.CTkButton(self.sidebar_frame, text="Arquivo Único", command=lambda: self.select_tab("single"), **btn_kwargs)
-        self.btn_tab_single.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+        self.create_sidebar_button("single", "Arquivo Único", 1)
+        self.create_sidebar_button("batch", "Fila (Lote)", 2)
+        self.create_sidebar_button("models", "Modelos", 3)
+        self.create_sidebar_button("settings", "Configurações", 4)
 
-        self.btn_tab_batch = ctk.CTkButton(self.sidebar_frame, text="Fila (Lote)", command=lambda: self.select_tab("batch"), **btn_kwargs)
-        self.btn_tab_batch.grid(row=2, column=0, padx=10, pady=5, sticky="ew")
+        # --- ÁREA PRINCIPAL ---
+        self.main_container = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.main_container.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        self.main_container.grid_rowconfigure(0, weight=1)
+        self.main_container.grid_columnconfigure(0, weight=1)
 
-        self.btn_tab_models = ctk.CTkButton(self.sidebar_frame, text="Modelos", command=lambda: self.select_tab("models"), **btn_kwargs)
-        self.btn_tab_models.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
-
-        self.btn_tab_settings = ctk.CTkButton(self.sidebar_frame, text="Configurações", command=lambda: self.select_tab("settings"), **btn_kwargs)
-        self.btn_tab_settings.grid(row=4, column=0, padx=10, pady=5, sticky="ew")
-
+        # Container interno para simular os "Cards" do Utilitário de Disco
         self.frames = {}
         
-        # --- TAB SINGLE ---
-        self.frames["single"] = ctk.CTkFrame(self, corner_radius=10, fg_color=("gray95", "gray15"))
-        self.frames["single"].grid_columnconfigure(0, weight=1)
+        # === TAB SINGLE ===
+        self.frames["single"] = self.create_card_frame()
         self.frames["single"].grid_rowconfigure(5, weight=1)
         
-        ctk.CTkLabel(self.frames["single"], text="Transcrição Única", font=ctk.CTkFont(size=20, weight="bold")).grid(row=0, column=0, padx=30, pady=(30, 15), sticky="w")
+        self.create_header(self.frames["single"], "Transcrição Única", 0)
         
         self.single_file_path = ctk.StringVar()
         self.single_out_path = ctk.StringVar(value=str(ROOT_DIR / "output"))
 
-        f1 = ctk.CTkFrame(self.frames["single"], fg_color="transparent")
-        f1.grid(row=1, column=0, padx=30, pady=5, sticky="ew")
-        f1.grid_columnconfigure(1, weight=1)
+        # Grupo de Seleção
+        g1 = self.create_group(self.frames["single"], 1)
+        ctk.CTkButton(g1, text="Selecionar Mídia", command=self.browse_single_file, width=120, fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=0, column=0, padx=15, pady=15)
+        ctk.CTkEntry(g1, textvariable=self.single_file_path, state="disabled", fg_color="transparent", border_width=0, text_color="gray80").grid(row=0, column=1, sticky="ew", padx=(0,15))
         
-        ctk.CTkButton(f1, text="Selecionar Mídia", command=self.browse_single_file, width=120).grid(row=0, column=0, padx=(0, 10), pady=10)
-        ctk.CTkEntry(f1, textvariable=self.single_file_path, state="disabled", fg_color="transparent").grid(row=0, column=1, sticky="ew")
-        
-        ctk.CTkButton(f1, text="Salvar Em", command=self.browse_single_out, width=120).grid(row=1, column=0, padx=(0, 10), pady=10)
-        ctk.CTkEntry(f1, textvariable=self.single_out_path, state="disabled", fg_color="transparent").grid(row=1, column=1, sticky="ew")
+        ctk.CTkButton(g1, text="Salvar Em", command=self.browse_single_out, width=120, fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=1, column=0, padx=15, pady=(0,15))
+        ctk.CTkEntry(g1, textvariable=self.single_out_path, state="disabled", fg_color="transparent", border_width=0, text_color="gray80").grid(row=1, column=1, sticky="ew", padx=(0,15))
 
-        # Botões de controle Single
+        # Grupo de Controles
         c1 = ctk.CTkFrame(self.frames["single"], fg_color="transparent")
-        c1.grid(row=2, column=0, padx=30, pady=10, sticky="ew")
-        c1.grid_columnconfigure(0, weight=1)
-        c1.grid_columnconfigure(1, weight=1)
-        c1.grid_columnconfigure(2, weight=1)
+        c1.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+        c1.grid_columnconfigure((0,1,2), weight=1)
 
-        self.btn_run_single = ctk.CTkButton(c1, text="Iniciar", height=40, command=self.run_single)
-        self.btn_run_single.grid(row=0, column=0, padx=5, sticky="ew")
+        self.btn_run_single = ctk.CTkButton(c1, text="Iniciar Transcrição", height=35, command=self.run_single, fg_color="#0066CC", hover_color="#005BB5")
+        self.btn_run_single.grid(row=0, column=0, padx=(0,5), sticky="ew")
         
-        self.btn_pause_single = ctk.CTkButton(c1, text="Pausar", height=40, command=self.toggle_pause, state="disabled", fg_color="transparent", border_width=1)
+        self.btn_pause_single = ctk.CTkButton(c1, text="Pausar", height=35, command=self.toggle_pause, state="disabled", fg_color="#3A3A3C", hover_color="#4A4A4C")
         self.btn_pause_single.grid(row=0, column=1, padx=5, sticky="ew")
         
-        self.btn_stop_single = ctk.CTkButton(c1, text="Parar", height=40, command=self.stop_process, state="disabled", fg_color="transparent", border_width=1, hover_color="darkred")
-        self.btn_stop_single.grid(row=0, column=2, padx=5, sticky="ew")
+        self.btn_stop_single = ctk.CTkButton(c1, text="Parar", height=35, command=self.stop_process, state="disabled", fg_color="#3A3A3C", hover_color="#4A4A4C")
+        self.btn_stop_single.grid(row=0, column=2, padx=(5,0), sticky="ew")
 
-        self.prog_single = ctk.CTkProgressBar(self.frames["single"])
-        self.prog_single.grid(row=3, column=0, padx=30, pady=(10, 10), sticky="ew")
+        # Progresso
+        self.prog_single = ctk.CTkProgressBar(self.frames["single"], height=10, progress_color="#007AFF", fg_color="#2C2C2E")
+        self.prog_single.grid(row=3, column=0, padx=20, pady=(15, 5), sticky="ew")
         self.prog_single.set(0)
 
-        self.log_single = ctk.CTkTextbox(self.frames["single"], fg_color=("gray90", "gray10"), text_color=("gray20", "gray80"))
-        self.log_single.grid(row=4, column=0, padx=30, pady=(0, 30), sticky="nsew")
+        # Log
+        self.log_single = ctk.CTkTextbox(self.frames["single"], fg_color="#1C1C1E", text_color="gray80", border_width=1, border_color="#2C2C2E", corner_radius=8)
+        self.log_single.grid(row=5, column=0, padx=20, pady=(10, 20), sticky="nsew")
 
-        # --- TAB BATCH ---
-        self.frames["batch"] = ctk.CTkFrame(self, corner_radius=10, fg_color=("gray95", "gray15"))
-        self.frames["batch"].grid_columnconfigure(0, weight=1)
-        self.frames["batch"].grid_rowconfigure(4, weight=1)
+        # === TAB BATCH ===
+        self.frames["batch"] = self.create_card_frame()
+        self.frames["batch"].grid_rowconfigure(5, weight=1)
 
-        ctk.CTkLabel(self.frames["batch"], text="Fila de Processamento", font=ctk.CTkFont(size=20, weight="bold")).grid(row=0, column=0, padx=30, pady=(30, 15), sticky="w")
+        self.create_header(self.frames["batch"], "Fila de Processamento", 0)
 
-        f2 = ctk.CTkFrame(self.frames["batch"], fg_color="transparent")
-        f2.grid(row=1, column=0, padx=30, pady=5, sticky="ew")
-        f2.grid_columnconfigure(0, weight=1)
+        g2 = self.create_group(self.frames["batch"], 1)
+        
+        f2_btns = ctk.CTkFrame(g2, fg_color="transparent")
+        f2_btns.grid(row=0, column=0, sticky="ew", padx=15, pady=(15,5))
+        ctk.CTkButton(f2_btns, text="Adicionar", command=self.batch_add_files, width=100, fg_color="#3A3A3C", hover_color="#4A4A4C").pack(side="left")
+        ctk.CTkButton(f2_btns, text="Limpar", command=self.batch_clear, width=100, fg_color="transparent", border_width=1, border_color="#4A4A4C", hover_color="#3A3A3C").pack(side="right")
 
-        f2_btns = ctk.CTkFrame(f2, fg_color="transparent")
-        f2_btns.grid(row=0, column=0, sticky="ew")
-        ctk.CTkButton(f2_btns, text="Adicionar", command=self.batch_add_files, width=100).pack(side="left", pady=5)
-        ctk.CTkButton(f2_btns, text="Limpar Fila", command=self.batch_clear, width=100, fg_color="transparent", border_width=1).pack(side="right", pady=5)
-
-        self.batch_listbox = ctk.CTkTextbox(f2, height=80, fg_color="transparent", border_width=1)
-        self.batch_listbox.grid(row=1, column=0, pady=10, sticky="ew")
+        self.batch_listbox = ctk.CTkTextbox(g2, height=80, fg_color="#1C1C1E", border_width=0, corner_radius=6)
+        self.batch_listbox.grid(row=1, column=0, padx=15, pady=5, sticky="ew")
         self.batch_files = []
 
         self.batch_out_path = ctk.StringVar(value=str(ROOT_DIR / "output"))
-        f2_out = ctk.CTkFrame(f2, fg_color="transparent")
-        f2_out.grid(row=2, column=0, pady=5, sticky="ew")
+        f2_out = ctk.CTkFrame(g2, fg_color="transparent")
+        f2_out.grid(row=2, column=0, pady=(5,15), padx=15, sticky="ew")
         f2_out.grid_columnconfigure(1, weight=1)
-        ctk.CTkButton(f2_out, text="Salvar Em", command=self.browse_batch_out, width=100).grid(row=0, column=0, padx=(0,10))
-        ctk.CTkEntry(f2_out, textvariable=self.batch_out_path, state="disabled", fg_color="transparent").grid(row=0, column=1, sticky="ew")
+        ctk.CTkButton(f2_out, text="Salvar Em", command=self.browse_batch_out, width=100, fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=0, column=0, padx=(0,10))
+        ctk.CTkEntry(f2_out, textvariable=self.batch_out_path, state="disabled", fg_color="transparent", border_width=0).grid(row=0, column=1, sticky="ew")
 
         # Botões de controle Batch
         c2 = ctk.CTkFrame(self.frames["batch"], fg_color="transparent")
-        c2.grid(row=2, column=0, padx=30, pady=10, sticky="ew")
-        c2.grid_columnconfigure(0, weight=1)
-        c2.grid_columnconfigure(1, weight=1)
-        c2.grid_columnconfigure(2, weight=1)
+        c2.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+        c2.grid_columnconfigure((0,1,2), weight=1)
 
-        self.btn_run_batch = ctk.CTkButton(c2, text="Processar Fila", height=40, command=self.run_batch)
-        self.btn_run_batch.grid(row=0, column=0, padx=5, sticky="ew")
+        self.btn_run_batch = ctk.CTkButton(c2, text="Processar Fila", height=35, command=self.run_batch, fg_color="#0066CC", hover_color="#005BB5")
+        self.btn_run_batch.grid(row=0, column=0, padx=(0,5), sticky="ew")
         
-        self.btn_pause_batch = ctk.CTkButton(c2, text="Pausar", height=40, command=self.toggle_pause, state="disabled", fg_color="transparent", border_width=1)
+        self.btn_pause_batch = ctk.CTkButton(c2, text="Pausar", height=35, command=self.toggle_pause, state="disabled", fg_color="#3A3A3C", hover_color="#4A4A4C")
         self.btn_pause_batch.grid(row=0, column=1, padx=5, sticky="ew")
         
-        self.btn_stop_batch = ctk.CTkButton(c2, text="Parar", height=40, command=self.stop_process, state="disabled", fg_color="transparent", border_width=1, hover_color="darkred")
-        self.btn_stop_batch.grid(row=0, column=2, padx=5, sticky="ew")
+        self.btn_stop_batch = ctk.CTkButton(c2, text="Parar", height=35, command=self.stop_process, state="disabled", fg_color="#3A3A3C", hover_color="#4A4A4C")
+        self.btn_stop_batch.grid(row=0, column=2, padx=(5,0), sticky="ew")
 
-        self.prog_batch = ctk.CTkProgressBar(self.frames["batch"])
-        self.prog_batch.grid(row=3, column=0, padx=30, pady=(10, 10), sticky="ew")
+        self.prog_batch = ctk.CTkProgressBar(self.frames["batch"], height=10, progress_color="#007AFF", fg_color="#2C2C2E")
+        self.prog_batch.grid(row=3, column=0, padx=20, pady=(15, 5), sticky="ew")
         self.prog_batch.set(0)
 
-        self.log_batch = ctk.CTkTextbox(self.frames["batch"], fg_color=("gray90", "gray10"), text_color=("gray20", "gray80"))
-        self.log_batch.grid(row=4, column=0, padx=30, pady=(0, 30), sticky="nsew")
+        self.log_batch = ctk.CTkTextbox(self.frames["batch"], fg_color="#1C1C1E", text_color="gray80", border_width=1, border_color="#2C2C2E", corner_radius=8)
+        self.log_batch.grid(row=5, column=0, padx=20, pady=(10, 20), sticky="nsew")
 
-        # --- TAB MODELS ---
-        self.frames["models"] = ctk.CTkFrame(self, corner_radius=10, fg_color=("gray95", "gray15"))
-        self.frames["models"].grid_columnconfigure(0, weight=1)
-        self.frames["models"].grid_rowconfigure(2, weight=1)
+        # === TAB MODELS ===
+        self.frames["models"] = self.create_card_frame()
+        self.frames["models"].grid_rowconfigure(3, weight=1)
         
-        ctk.CTkLabel(self.frames["models"], text="Modelos MLX (Cache)", font=ctk.CTkFont(size=20, weight="bold")).grid(row=0, column=0, padx=30, pady=(30, 15), sticky="w")
+        self.create_header(self.frames["models"], "Modelos de IA", 0)
         
-        f3 = ctk.CTkFrame(self.frames["models"], fg_color="transparent")
-        f3.grid(row=1, column=0, padx=30, pady=5, sticky="ew")
-        f3.grid_columnconfigure(0, weight=1)
+        g3 = self.create_group(self.frames["models"], 1)
         
-        ctk.CTkLabel(f3, text="Baixados:").grid(row=0, column=0, pady=(0, 5), sticky="w")
-        self.models_textbox = ctk.CTkTextbox(f3, height=80, fg_color="transparent", border_width=1)
-        self.models_textbox.grid(row=1, column=0, columnspan=3, pady=5, sticky="ew")
+        ctk.CTkLabel(g3, text="Modelos Baixados no Sistema:", text_color="gray70").grid(row=0, column=0, pady=(15, 5), padx=15, sticky="w")
+        self.models_textbox = ctk.CTkTextbox(g3, height=100, fg_color="#1C1C1E", border_width=0, corner_radius=6)
+        self.models_textbox.grid(row=1, column=0, columnspan=3, pady=(0,15), padx=15, sticky="ew")
         
-        self.model_combo = ctk.CTkComboBox(f3, values=backend.MODELS)
-        self.model_combo.grid(row=2, column=0, pady=20, sticky="w")
+        self.model_combo = ctk.CTkComboBox(g3, values=backend.MODELS, fg_color="#2C2C2E", border_width=0)
+        self.model_combo.grid(row=2, column=0, pady=(0,15), padx=15, sticky="w")
         
-        ctk.CTkButton(f3, text="Baixar", command=self.download_model, width=100).grid(row=2, column=1, padx=10, pady=20)
-        ctk.CTkButton(f3, text="Excluir", command=self.delete_model, width=100, fg_color="transparent", border_width=1).grid(row=2, column=2, pady=20)
+        ctk.CTkButton(g3, text="Baixar", command=self.download_model, width=100, fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=2, column=1, padx=10, pady=(0,15))
+        ctk.CTkButton(g3, text="Excluir", command=self.delete_model, width=100, fg_color="transparent", border_width=1, border_color="#4A4A4C").grid(row=2, column=2, pady=(0,15), padx=(0,15))
 
-        self.log_models = ctk.CTkTextbox(self.frames["models"], fg_color=("gray90", "gray10"), text_color=("gray20", "gray80"))
-        self.log_models.grid(row=3, column=0, padx=30, pady=(0, 30), sticky="nsew")
+        self.log_models = ctk.CTkTextbox(self.frames["models"], fg_color="#1C1C1E", text_color="gray80", border_width=1, border_color="#2C2C2E", corner_radius=8)
+        self.log_models.grid(row=3, column=0, padx=20, pady=(10, 20), sticky="nsew")
 
-        # --- TAB SETTINGS ---
-        self.frames["settings"] = ctk.CTkFrame(self, corner_radius=10, fg_color=("gray95", "gray15"))
-        self.frames["settings"].grid_columnconfigure(0, weight=1)
+        # === TAB SETTINGS ===
+        self.frames["settings"] = self.create_card_frame()
+        self.frames["settings"].grid_rowconfigure(2, weight=1)
         
-        ctk.CTkLabel(self.frames["settings"], text="Configurações", font=ctk.CTkFont(size=20, weight="bold")).grid(row=0, column=0, padx=30, pady=(30, 15), sticky="w")
+        self.create_header(self.frames["settings"], "Configurações", 0)
 
-        f4 = ctk.CTkFrame(self.frames["settings"], fg_color="transparent")
-        f4.grid(row=1, column=0, padx=30, pady=5, sticky="nsew")
-        f4.grid_columnconfigure(1, weight=1)
+        g4 = self.create_group(self.frames["settings"], 1)
         
         self.cfg_model = ctk.StringVar(value="medium")
         self.cfg_lang = ctk.StringVar(value="auto")
 
-        row_idx = 0
-        def add_setting(label, var, values):
-            nonlocal row_idx
-            ctk.CTkLabel(f4, text=label).grid(row=row_idx, column=0, pady=10, sticky="w")
-            ctk.CTkComboBox(f4, variable=var, values=values).grid(row=row_idx, column=1, padx=20, pady=10, sticky="w")
-            row_idx += 1
+        ctk.CTkLabel(g4, text="Modelo MLX Padrão:").grid(row=0, column=0, pady=15, padx=20, sticky="w")
+        ctk.CTkComboBox(g4, variable=self.cfg_model, values=backend.MODELS, fg_color="#2C2C2E", border_width=0).grid(row=0, column=1, padx=20, pady=15, sticky="e")
+        
+        ctk.CTkLabel(g4, text="Idioma Padrão:").grid(row=1, column=0, pady=(0,15), padx=20, sticky="w")
+        ctk.CTkComboBox(g4, variable=self.cfg_lang, values=["auto", "pt", "en", "es"], fg_color="#2C2C2E", border_width=0).grid(row=1, column=1, padx=20, pady=(0,15), sticky="e")
 
-        add_setting("Modelo MLX", self.cfg_model, backend.MODELS)
-        add_setting("Idioma Padrão", self.cfg_lang, ["auto", "pt", "en", "es"])
-
-        ctk.CTkButton(f4, text="Salvar", command=self.save_settings, width=150, height=40).grid(row=row_idx, column=0, columnspan=2, pady=30, sticky="w")
+        ctk.CTkButton(self.frames["settings"], text="Salvar Configurações", command=self.save_settings, width=150, height=35, fg_color="#0066CC", hover_color="#005BB5").grid(row=2, column=0, pady=20, padx=20, sticky="sw")
 
         # Initialize
         self.select_tab("single")
         self.load_settings()
         self.refresh_models()
 
+    # --- FUNÇÕES DE LAYOUT (MAC STYLE) ---
+    def create_sidebar_button(self, tab_id, text, row):
+        btn = ctk.CTkButton(
+            self.sidebar_frame, 
+            text=text, 
+            command=lambda: self.select_tab(tab_id),
+            fg_color="transparent", 
+            text_color="gray80", 
+            hover_color="#3A3A3C",
+            anchor="w",
+            corner_radius=6,
+            height=32,
+            font=ctk.CTkFont(size=13)
+        )
+        btn.grid(row=row, column=0, padx=10, pady=2, sticky="ew")
+        self.tab_buttons[tab_id] = btn
+
+    def create_card_frame(self):
+        # Frame que imita o card principal com bordas arredondadas e cor levemente mais clara que o fundo
+        f = ctk.CTkFrame(self.main_container, corner_radius=10, fg_color="#2C2C2E")
+        f.grid_columnconfigure(0, weight=1)
+        return f
+
+    def create_group(self, parent, row):
+        # Grupo de opções (estilo caixa arredondada dentro do card)
+        g = ctk.CTkFrame(parent, corner_radius=8, fg_color="#1C1C1E")
+        g.grid(row=row, column=0, padx=20, pady=10, sticky="ew")
+        g.grid_columnconfigure(0, weight=1)
+        return g
+
+    def create_header(self, parent, title, row):
+        ctk.CTkLabel(parent, text=title, font=ctk.CTkFont(size=22, weight="bold"), text_color="white").grid(row=row, column=0, padx=20, pady=(20, 10), sticky="w")
+
     def select_tab(self, tab_name):
         for frame in self.frames.values():
             frame.grid_forget()
         
-        for btn in [self.btn_tab_single, self.btn_tab_batch, self.btn_tab_models, self.btn_tab_settings]:
-            btn.configure(fg_color="transparent")
+        for btn in self.tab_buttons.values():
+            btn.configure(fg_color="transparent", text_color="gray80")
             
-        active_btn = {
-            "single": self.btn_tab_single,
-            "batch": self.btn_tab_batch,
-            "models": self.btn_tab_models,
-            "settings": self.btn_tab_settings
-        }[tab_name]
-        active_btn.configure(fg_color=("gray85", "gray25"))
+        active_btn = self.tab_buttons[tab_name]
+        # Azul clássico de seleção do Mac
+        active_btn.configure(fg_color="#0066CC", text_color="white")
         
-        self.frames[tab_name].grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        self.frames[tab_name].grid(row=0, column=0, sticky="nsew")
 
     # --- Controle de Processos ---
     def toggle_pause(self):
@@ -251,8 +269,8 @@ class TranscritorGUI(ctk.CTk):
         if not self.current_process: return
         try:
             self.current_process.terminate()
-            self.log_single.insert("end", "\n[Transcrição Interrompida pelo Usuário]\n")
-            self.log_batch.insert("end", "\n[Transcrição Interrompida pelo Usuário]\n")
+            self.log_single.insert("end", "\n[Transcrição Cancelada pelo Usuário]\n")
+            self.log_batch.insert("end", "\n[Transcrição Cancelada pelo Usuário]\n")
         except Exception as e:
             print(f"Erro ao parar: {e}")
 
@@ -356,7 +374,6 @@ class TranscritorGUI(ctk.CTk):
         threading.Thread(target=run, daemon=True).start()
 
     def handle_progress_line(self, text, log_widget, prog_widget, is_cr):
-        # Em mlx-whisper com verbose=True os prints saem linha por linha normais.
         def update_log():
             if is_cr:
                 lines = log_widget.get("0.0", "end").split("\n")
@@ -368,22 +385,13 @@ class TranscritorGUI(ctk.CTk):
                 log_widget.see("end")
         self.after(0, update_log)
 
-        # O mlx-whisper geralmente printa [00:00.000 --> 00:05.000] Algum texto...
-        # Podemos tentar parsear o timestamp final de cada linha para o progresso.
         if "-->" in text:
             matches = re.findall(r"(\d{2}):(\d{2})\.(\d{3})", text)
             if matches:
-                # Pegar o último timestamp da linha
                 try:
-                    m, s, ms = map(int, matches[-1])
-                    t_sec = m * 60 + s
-                    # Como mlx-whisper não nos dá a duração total no print, 
-                    # a barra de progresso em transcrição pode ser apenas um indicador visual,
-                    # Mas tentaremos estimar se o usuário já souber. Por hora deixamos como indeterminado 
-                    # ou subimos aos poucos. Aqui fazemos um bump para mostrar atividade.
                     current = prog_widget.get()
                     if current < 0.95:
-                        prog_widget.set(current + 0.01)
+                        prog_widget.set(current + 0.02)
                 except: pass
 
     # --- Funções Models e Settings ---
@@ -428,9 +436,6 @@ class TranscritorGUI(ctk.CTk):
             try: cfg = toml.load(str(CONFIG_PATH))
             except: pass
         cfg["model"] = self.cfg_model.get()
-        # Removemos os campos inúteis pro mlx (device/compute_type)
-        if "device" in cfg: del cfg["device"]
-        if "compute_type" in cfg: del cfg["compute_type"]
         
         lang = self.cfg_lang.get()
         cfg["language"] = None if lang == "auto" else lang
