@@ -7,17 +7,6 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
-# Força o tqdm a exibir a barra de progresso (engana o isatty)
-class FakeTTY:
-    def __init__(self, stream):
-        self._stream = stream
-    def __getattr__(self, name):
-        return getattr(self._stream, name)
-    def isatty(self):
-        return True
-
-sys.stderr = FakeTTY(sys.stderr)
-
 # Importa o módulo do projeto original, agora adaptado para MLX
 import tools.transcribe as tr
 
