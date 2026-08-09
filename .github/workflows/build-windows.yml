@@ -32,7 +32,7 @@ jobs:
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --noconfirm --onefile --windowed --name "SimpleTranscribe" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --add-data "tools;tools/" --add-data "gui;gui/" "gui/main.py"
+        pyinstaller --noconfirm --onefile --windowed --name "SimpleTranscribe" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "tools;tools/" --add-data "gui;gui/" "gui/main.py"
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
