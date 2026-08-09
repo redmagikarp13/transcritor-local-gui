@@ -213,7 +213,14 @@ class SimpleTranscribeGUI(ctk.CTk):
         ctk.CTkLabel(g4, text="Precisão (Compute):").grid(row=3, column=0, pady=(0,15), padx=20, sticky="w")
         ctk.CTkComboBox(g4, variable=self.cfg_compute, values=["int8", "float16", "float32"], fg_color="#2C2C2E", border_width=0).grid(row=3, column=1, padx=20, pady=(0,15), sticky="e")
 
-        ctk.CTkButton(self.frames["settings"], text="Salvar Configurações", command=self.save_settings, width=150, height=35, fg_color="#0066CC", hover_color="#005BB5").grid(row=2, column=0, pady=20, padx=20, sticky="sw")
+        g_cuda = self.create_group(self.frames["settings"], 2)
+        ctk.CTkLabel(g_cuda, text="Aceleração por Placa de Vídeo (NVIDIA)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, pady=(15, 5), padx=20, sticky="w")
+        ctk.CTkLabel(g_cuda, text="Para usar a GPU, você precisa ter o CUDA Toolkit 12 instalado no Windows.\nO programa usará a CPU automaticamente se as bibliotecas não forem encontradas.", text_color="gray60", justify="left").grid(row=1, column=0, pady=(0, 15), padx=20, sticky="w")
+        
+        import webbrowser
+        ctk.CTkButton(g_cuda, text="Baixar CUDA Toolkit", command=lambda: webbrowser.open("https://developer.nvidia.com/cuda-downloads"), fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=1, column=1, padx=20, pady=(0,15), sticky="e")
+
+        ctk.CTkButton(self.frames["settings"], text="Salvar Configurações", command=self.save_settings, width=150, height=35, fg_color="#0066CC", hover_color="#005BB5").grid(row=3, column=0, pady=20, padx=20, sticky="sw")
 
         # === TAB CREDITS ===
         self.frames["credits"] = self.create_card_frame()
