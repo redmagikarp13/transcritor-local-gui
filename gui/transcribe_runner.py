@@ -7,13 +7,16 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
-# Importa o módulo do projeto original, agora adaptado para MLX
-import tools.transcribe as tr
-
 def run_transcription(files, output_dir, config_override=None):
     if config_override is None:
         config_override = {}
         
+    print(f"[{len(files)} arquivo(s) na fila para processamento (faster-whisper)]", flush=True)
+    print("Iniciando ambiente e carregando dependências (Isso pode demorar um pouco na primeira vez)...", flush=True)
+    
+    # Importa o módulo do projeto original SOMENTE DEPOIS de dar o aviso
+    import tools.transcribe as tr
+
     cfg = tr.load_cfg()
     cfg.update(config_override)
 
@@ -21,7 +24,6 @@ def run_transcription(files, output_dir, config_override=None):
     if output_dir:
         tr.OUTPUT = Path(output_dir)
 
-    print(f"[{len(files)} arquivo(s) na fila para processamento (faster-whisper)]", flush=True)
     print(f"Carregando modelo '{cfg.get('model')}'... (Se for a primeira vez, o download automático pode demorar vários minutos)", flush=True)
 
     try:
