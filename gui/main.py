@@ -381,12 +381,11 @@ class SimpleTranscribeGUI(ctk.CTk):
 
     # --- Subprocesso ---
     def start_transcription_thread(self, args, log_widget, btn_run, prog_widget, btn_pause, btn_stop):
-        runner_path = str(ROOT_DIR / "gui" / "transcribe_runner.py")
-        
         def run():
             try:
+                # Usa o próprio arquivo main.py com a flag --runner
                 self.current_process = subprocess.Popen(
-                    [sys.executable, "-u", runner_path],
+                    [sys.executable, "-u", __file__, "--runner"],
                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0
                 )
                 self.current_process.stdin.write(json.dumps(args).encode("utf-8"))
@@ -509,6 +508,71 @@ class SimpleTranscribeGUI(ctk.CTk):
         except Exception as e:
             messagebox.showerror("Erro", f"Erro: {e}")
 
+def run_transcription(files, output_dir, config_override=None):
+    if config_override is None:
+        config_override = {}
+        
+    print(f"[{len(files)} arquivo(s) na fila para processamento (faster-whisper)]", flush=True)
+    print("Iniciando ambiente e carregando dependências (Isso pode demorar um pouco na primeira vez)...", flush=True)
+    
+    # Importa o módulo do projeto original SOMENTE DEPOIS de dar o aviso
+    import tools.transcribe as tr
+
+    cfg = tr.load_cfg()
+    cfg.update(config_override)
+
+    if output_dir:
+        tr.OUTPUT = Path(output_dir)
+
+    print(f"Carregando modelo '{cfg.get('model')}'... (Se for a primeira vez, o download automático pode demorar vários minutos)", flush=True)
+
+    try:
+        model = tr.load_model(cfg)
+        on_cpu = cfg.get("device") == "cpu"
+        falhas = 0
+        for p_str in files:
+            path = Path(p_str)
+            try:
+                tr.transcribe_one(path, model, cfg)
+            except Exception as e:
+                msg = str(e).lower()
+                gpu_err = any(k in msg for k in ("out of memory", "cuda failed", "cublas", "cudnn"))
+                if gpu_err and not on_cpu:
+                    print(f"\n[aviso] erro de GPU ({e}).", flush=True)
+                    print("[aviso] Recarregando o modelo em CPU (int8) e tentando de novo...", flush=True)
+                    cfg = dict(cfg, device="cpu", compute_type="int8")
+                    model = tr.load_model(cfg)
+                    on_cpu = True
+                    try:
+                        tr.transcribe_one(path, model, cfg)
+                    except Exception as e2:
+                        falhas += 1
+                        print(f"\n[erro] falha mesmo em CPU: {e2}", flush=True)
+                else:
+                    falhas += 1
+                    print(f"\n[erro] falha ao transcrever {path.name}: {e}", flush=True)
+        
+        total = len(files)
+        print(f"\nCONCLUIDO: {total - falhas}/{total} arquivo(s) transcrito(s).", flush=True)
+
+    except Exception as e:
+        print(f"\nERRO FATAL: {e}", flush=True)
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--runner":
+        try:
+            import json, traceback
+            input_data = sys.stdin.read()
+            args = json.loads(input_data)
+            run_transcription(
+                files=args.get("files", []),
+                output_dir=args.get("output_dir"),
+                config_override=args.get("config", {})
+            )
+        except Exception as e:
+            import traceback
+            print(f"ERRO FATAL NO RUNNER: {e}\n{traceback.format_exc()}", flush=True)
+        sys.exit(0)
+
     app = SimpleTranscribeGUI()
     app.mainloop()
