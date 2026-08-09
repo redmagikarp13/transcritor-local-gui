@@ -79,7 +79,10 @@ SAMPLE_RATE = 16000
 Seg = namedtuple("Seg", ["start", "end", "text"])
 
 # Raiz do workspace (tools/ é parents[0]; a raiz é parents[1]).
-ROOT = Path(__file__).resolve().parents[1]
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    ROOT = Path(sys._MEIPASS)
+else:
+    ROOT = Path(__file__).resolve().parents[1]
 INBOX = ROOT / "inbox"
 OUTPUT = ROOT / "output"
 CONFIG_PATH = Path(__file__).with_name("config.toml")

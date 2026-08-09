@@ -29,10 +29,18 @@ jobs:
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --noconfirm --onedir --windowed --name "SimpleTranscribe" --add-data "tools;tools/" --add-data "gui;gui/" "gui/main.py"
+        pyinstaller --noconfirm --onefile --windowed --name "SimpleTranscribe" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --add-data "tools;tools/" --add-data "gui;gui/" "gui/main.py"
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: SimpleTranscribe-Windows
-        path: dist/SimpleTranscribe/
+        path: dist/SimpleTranscribe.exe
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/SimpleTranscribe.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

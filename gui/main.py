@@ -10,7 +10,11 @@ import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import toml
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+# Adiciona o diretório raiz para o PyInstaller e script normal
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    ROOT_DIR = Path(sys._MEIPASS)
+else:
+    ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
 import gui.backend as backend
