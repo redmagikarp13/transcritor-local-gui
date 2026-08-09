@@ -387,9 +387,13 @@ class SimpleTranscribeGUI(ctk.CTk):
     def start_transcription_thread(self, args, log_widget, btn_run, prog_widget, btn_pause, btn_stop):
         def run():
             try:
-                # Usa o próprio arquivo main.py com a flag --runner
+                if getattr(sys, 'frozen', False):
+                    cmd = [sys.executable, "--runner"]
+                else:
+                    cmd = [sys.executable, "-u", __file__, "--runner"]
+                    
                 self.current_process = subprocess.Popen(
-                    [sys.executable, "-u", __file__, "--runner"],
+                    cmd,
                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0
                 )
                 self.current_process.stdin.write(json.dumps(args).encode("utf-8"))
@@ -563,7 +567,16 @@ def run_transcription(files, output_dir, config_override=None):
         print(f"\nERRO FATAL: {e}", flush=True)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "--runner":
+    import os
+    if getattr(sys, 'frozen', False):
+        import multiprocessing
+        multiprocessing.freeze_support()
+        if sys.stdout is None:
+            sys.stdout = open(os.devnull, "w")
+        if sys.stderr is None:
+            sys.stderr = open(os.devnull, "w")
+
+    if "--runner" in sys.argv:
         try:
             import json, traceback
             input_data = sys.stdin.read()
