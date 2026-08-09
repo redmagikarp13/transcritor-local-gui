@@ -151,16 +151,20 @@ def load_model(cfg: dict) -> WhisperModel:
     """
     device = cfg["device"]
     compute_type = cfg["compute_type"]
+    import os
+    threads = os.cpu_count() or 4
+    
     if device != "cpu":
         try:
-            model = WhisperModel(cfg["model"], device=device, compute_type=compute_type)
-            print(f"Modelo '{cfg['model']}' carregado em {device} ({compute_type}).")
+            model = WhisperModel(cfg["model"], device=device, compute_type=compute_type, cpu_threads=threads)
+            print(f"Modelo '{cfg['model']}' carregado em {device} ({compute_type}) com {threads} threads.")
             return model
         except Exception as e:
             print(f"[aviso] GPU indisponível ou falhou ({e}).")
             print("[aviso] Recaindo para device='cpu', compute_type='int8'.")
-    model = WhisperModel(cfg["model"], device="cpu", compute_type="int8")
-    print(f"Modelo '{cfg['model']}' carregado em cpu (int8).")
+            
+    model = WhisperModel(cfg["model"], device="cpu", compute_type="int8", cpu_threads=threads)
+    print(f"Modelo '{cfg['model']}' carregado em cpu (int8) usando {threads} threads.")
     return model
 
 
