@@ -4,6 +4,10 @@
 # Engine de transcricao (lib usada direto pelo transcribe.py):
 faster-whisper
 
+# GUI dependencies
+toml
+customtkinter
+
 # CLI drop-in compativel com o Whisper original (atalho opcional de linha de comando):
 whisper-ctranslate2
 
