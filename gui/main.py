@@ -29,7 +29,7 @@ class SimpleTranscribeGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Simple Transcribe")
+        self.title("Transcritor Local")
         self.geometry("950x650")
         
         # O macOS nativo geralmente usa um cinza bem escuro no fundo principal
@@ -49,7 +49,7 @@ class SimpleTranscribeGUI(ctk.CTk):
 
         self.logo_label = ctk.CTkLabel(
             self.sidebar_frame, 
-            text="Simple Transcribe", 
+            text="Transcritor Local", 
             font=ctk.CTkFont(size=18, weight="bold")
         )
         self.logo_label.grid(row=0, column=0, padx=20, pady=(30, 20), sticky="w")
@@ -230,7 +230,7 @@ class SimpleTranscribeGUI(ctk.CTk):
 
         g5 = self.create_group(self.frames["credits"], 1)
         
-        ctk.CTkLabel(g5, text="Simple Transcribe", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(20, 5))
+        ctk.CTkLabel(g5, text="Transcritor Local", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(20, 5))
         ctk.CTkLabel(g5, text="Uma interface gráfica multiplataforma para o transcritor-local.", text_color="gray70").pack(pady=(0, 20))
         
         credits_text = (

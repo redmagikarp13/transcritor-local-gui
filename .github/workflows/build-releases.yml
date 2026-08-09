@@ -36,21 +36,21 @@ jobs:
     - name: Build with PyInstaller (Windows)
       if: runner.os == 'Windows'
       run: |
-        pyinstaller --noconfirm --onefile --windowed --name "SimpleTranscribe" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "tools;tools/" --add-data "gui;gui/" "gui/main.py"
+        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "tools;tools/" --add-data "gui;gui/" "gui/main.py"
 
     - name: Build with PyInstaller (Mac)
       if: runner.os == 'macOS'
       run: |
-        pyinstaller --noconfirm --onefile --windowed --name "SimpleTranscribe-Mac" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "tools:tools/" --add-data "gui:gui/" "gui/main.py"
+        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal-Mac" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "tools:tools/" --add-data "gui:gui/" "gui/main.py"
         cd dist
-        zip -r SimpleTranscribe-Mac.zip "SimpleTranscribe-Mac.app"
+        zip -r TranscritorLocal-Mac.zip "TranscritorLocal-Mac.app"
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          dist/SimpleTranscribe.exe
-          dist/SimpleTranscribe-Mac.zip
+          dist/TranscritorLocal.exe
+          dist/TranscritorLocal-Mac.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
