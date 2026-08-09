@@ -387,21 +387,23 @@ class SimpleTranscribeGUI(ctk.CTk):
             try:
                 self.current_process = subprocess.Popen(
                     [sys.executable, "-u", runner_path],
-                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
+                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0
                 )
-                self.current_process.stdin.write(json.dumps(args))
+                self.current_process.stdin.write(json.dumps(args).encode("utf-8"))
                 self.current_process.stdin.close()
                 
-                buffer = ""
+                buffer = b""
                 while True:
                     char = self.current_process.stdout.read(1)
                     if not char: break
-                    if char == '\r':
-                        self.handle_progress_line(buffer, log_widget, prog_widget, is_cr=True)
-                        buffer = ""
-                    elif char == '\n':
-                        self.handle_progress_line(buffer, log_widget, prog_widget, is_cr=False)
-                        buffer = ""
+                    if char == b'\r':
+                        text = buffer.decode("utf-8", "replace")
+                        self.handle_progress_line(text, log_widget, prog_widget, is_cr=True)
+                        buffer = b""
+                    elif char == b'\n':
+                        text = buffer.decode("utf-8", "replace")
+                        self.handle_progress_line(text, log_widget, prog_widget, is_cr=False)
+                        buffer = b""
                     else:
                         buffer += char
 
