@@ -27,7 +27,7 @@ por vez, e a memória fica constante independente da duração total.
 
 import os
 import sys
-import tomllib
+import toml
 from collections import namedtuple
 from pathlib import Path
 
@@ -108,9 +108,9 @@ DEFAULTS = {
 def load_cfg() -> dict:
     """Carrega o config.toml e preenche os campos ausentes com os defaults."""
     cfg = dict(DEFAULTS)
-    if CONFIG_PATH.exists():
-        with open(CONFIG_PATH, "rb") as f:
-            cfg.update(tomllib.load(f))
+    if CONFIG_PATH.is_file():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            cfg.update(toml.load(f))
     # language pode vir como "auto" -> faster-whisper espera None para detectar.
     if str(cfg.get("language", "")).lower() in ("", "auto", "none"):
         cfg["language"] = None
