@@ -1,0 +1,10 @@
+# Copie este arquivo para tools/config.toml e ajuste para a sua maquina.
+# tools/config.toml e local e nao entra no Git.
+
+model = "medium"       # small (mais leve) | medium | large-v3 (mais preciso e pesado)
+device = "cpu"         # cpu (mais compativel) | cuda (GPU NVIDIA) | auto
+compute_type = "int8"  # int8 para CPU/pouca VRAM | float16 para GPU com folga
+language = "pt"        # pt, en, es, auto etc.
+vad_filter = true       # ignora silencios e reduz alucinacoes nesses trechos
+beam_size = 1           # menor usa menos memoria; aumente se houver folga
+chunk_minutes = 20      # reduza para 10 se faltar RAM em audios longos

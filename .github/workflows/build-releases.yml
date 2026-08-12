@@ -1,0 +1,57 @@
+name: Build Releases
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r src/transcritor/core/requirements.txt
+        pip install -r gui_requirements.txt
+        pip install pyinstaller
+
+    - name: Build with PyInstaller (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "src/transcritor/core;transcritor/core/" --add-data "src/transcritor/gui;transcritor/gui/" "src/transcritor/gui/main.py"
+
+    - name: Build with PyInstaller (Mac)
+      if: runner.os == 'macOS'
+      run: |
+        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal-Mac" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "src/transcritor/core:transcritor/core/" --add-data "src/transcritor/gui:transcritor/gui/" "src/transcritor/gui/main.py"
+        cd dist
+        zip -r TranscritorLocal-Mac.zip "TranscritorLocal-Mac.app"
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          dist/TranscritorLocal.exe
+          dist/TranscritorLocal-Mac.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

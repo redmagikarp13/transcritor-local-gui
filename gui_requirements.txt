@@ -1,0 +1,4 @@
+customtkinter
+darkdetect
+toml
+huggingface_hub

@@ -1,0 +1,32 @@
+# Dependencias do transcritor-local.
+# Instalar com:  pip install -r src/transcritor/core/requirements.txt
+#
+# Engine de transcricao (lib usada direto pelo transcribe.py):
+faster-whisper
+
+# GUI dependencies
+toml
+customtkinter
+
+# CLI drop-in compativel com o Whisper original (atalho opcional de linha de comando):
+whisper-ctranslate2
+
+# --- Bibliotecas NVIDIA (CUDA) -------------------------------------------------
+# NAO sao instaladas aqui de proposito. Motivos:
+#   1) So fazem sentido se voce for usar a GPU (device = "cuda"). Em CPU sao inuteis.
+#   2) O faster-whisper NAO as puxa automaticamente: o requirements.txt dele lista
+#      apenas ctranslate2, tokenizers, onnxruntime, av, tqdm, huggingface_hub --
+#      nenhum pacote nvidia-*. Voce precisa instala-las a mao.
+#
+# Se for usar GPU, rode (ver setup/install.md, passo 3):
+#   pip install nvidia-cublas-cu12 "nvidia-cudnn-cu12==9.*"
+#
+# Atencao ao pin do cuDNN: o CTranslate2 atual (>=4.5, que vem com o faster-whisper
+# recente) exige cuDNN *major version 9* para CUDA 12 -- NAO a serie 8.x.
+# No Windows as DLLs nao entram no PATH sozinhas; veja o passo 3.3 do install.md.
+#
+# --- Diarizacao opcional (quem falou) ------------------------------------------
+# Desligada por padrao. So se for separar falantes (puxa PyTorch, ~1-2 GB a mais):
+#   pip install "pyannote.audio==4.0"
+# Requer token gratuito do HuggingFace e aceitar os termos do modelo
+# pyannote/speaker-diarization-community-1 (ou o legado 3.1).

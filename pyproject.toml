@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transcritor-local"
+version = "1.0.0"
+description = "Transcritor local e privado de áudio e vídeo usando faster-whisper."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Transcritor Local Team"}
+]
+dependencies = [
+    "faster-whisper>=1.0.0",
+    "toml>=0.10.2",
+    "tqdm>=4.65.0",
+    "huggingface_hub>=0.20.0"
+]
+
+[project.optional-dependencies]
+gui = [
+    "customtkinter>=5.2.0",
+    "darkdetect"
+]
+dev = [
+    "pytest>=7.0.0",
+    "black",
+    "flake8"
+]
+
+[project.scripts]
+transcritor = "transcritor.cli:main"
+transcritor-gui = "transcritor.gui.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
