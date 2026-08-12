@@ -21,6 +21,10 @@ Seg = namedtuple("Seg", ["start", "end", "text"])
 # Raiz do workspace (suporte a PyInstaller frozen e execução normal)
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     ROOT = Path(sys._MEIPASS)
+    # Aponta o faster-whisper para o ffmpeg embutido no executável
+    _ffmpeg = ROOT / "ffmpeg.exe" if sys.platform == "win32" else ROOT / "ffmpeg"
+    if _ffmpeg.exists():
+        os.environ["PATH"] = str(ROOT) + os.pathsep + os.environ.get("PATH", "")
 else:
     # core/ -> transcritor/ -> src/ -> raiz do projeto
     ROOT = Path(__file__).resolve().parents[2]

@@ -34,15 +34,30 @@ jobs:
         pip install -r gui_requirements.txt
         pip install pyinstaller
 
+    - name: Download FFmpeg (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+        Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_tmp
+        $ffmpegDir = Get-ChildItem ffmpeg_tmp -Directory | Select-Object -First 1
+        Copy-Item "$($ffmpegDir.FullName)\bin\ffmpeg.exe" ffmpeg.exe
+        Remove-Item ffmpeg.zip, ffmpeg_tmp -Recurse -Force
+
+    - name: Download FFmpeg (Mac)
+      if: runner.os == 'macOS'
+      run: |
+        brew install ffmpeg
+        cp $(which ffmpeg) ffmpeg
+
     - name: Build with PyInstaller (Windows)
       if: runner.os == 'Windows'
       run: |
-        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "src/transcritor/core;transcritor/core/" --add-data "src/transcritor/gui;transcritor/gui/" "src/transcritor/gui/main.py"
+        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "src/transcritor/core;transcritor/core/" --add-data "src/transcritor/gui;transcritor/gui/" --add-binary "ffmpeg.exe;." "src/transcritor/gui/main.py"
 
     - name: Build with PyInstaller (Mac)
       if: runner.os == 'macOS'
       run: |
-        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal-Mac" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "src/transcritor/core:transcritor/core/" --add-data "src/transcritor/gui:transcritor/gui/" "src/transcritor/gui/main.py"
+        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal-Mac" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "src/transcritor/core:transcritor/core/" --add-data "src/transcritor/gui:transcritor/gui/" --add-binary "ffmpeg:." "src/transcritor/gui/main.py"
         cd dist
         zip -r TranscritorLocal-Mac.zip "TranscritorLocal-Mac.app"
 
