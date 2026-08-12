@@ -53,3 +53,9 @@ Thumbs.db
 Desktop.ini
 TranscritorLocal.app/
 TranscritorLocal.zip
+
+# Arquivos temporários do build local
+ffmpeg.exe
+ffmpeg
+ffmpeg_tmp/
+*.tar.xz
