@@ -1,4 +1,4 @@
-# SPEC — Transcritor Local (Whisper) · workspace ICM `transcritor-local`
+# SPEC — Simple Transcribe (Whisper) · workspace ICM `simpletranscribe`
 
 > Spec para criar uma pasta ICM especializada em transcrever áudios longos
 > localmente, de graça, com Whisper acelerado por GPU pequena.
@@ -86,7 +86,7 @@ Vulkan/OpenVINO — esforço alto, ganho incerto. Fica como nota de "experimento
 ## 3. Estrutura da pasta ICM (híbrida)
 
 ```
-transcritor-local/
+simpletranscribe/
 ├── CLAUDE.md                 # identidade + roteamento do workspace
 ├── CONTEXT.md                # como usar (cheatsheet de comandos)
 ├── setup/
@@ -346,7 +346,7 @@ python tools/transcribe.py
 
 ## 11. Checklist para criar a pasta
 
-- [ ] Criar `workspaces/transcritor-local/` com a estrutura do §3.
+- [ ] Criar `workspaces/simpletranscribe/` com a estrutura do §3.
 - [ ] Escrever `CLAUDE.md` (identidade + roteamento) e `CONTEXT.md` (cheatsheet).
 - [ ] Escrever `setup/install.md` (§4) e rodar `nvidia-smi` pra confirmar VRAM.
 - [ ] Implementar `tools/transcribe.py` + `config.toml` + `requirements.txt` (§5).

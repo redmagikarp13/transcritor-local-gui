@@ -118,18 +118,24 @@ Seg = namedtuple("Seg", ["start", "end", "text"])
 
 # Raiz do workspace (suporte a PyInstaller frozen e execução normal)
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    ROOT = Path(sys._MEIPASS)
+    BUNDLE_DIR = Path(sys._MEIPASS)
     # Aponta o faster-whisper para o ffmpeg embutido no executável
-    _ffmpeg = ROOT / "ffmpeg.exe" if sys.platform == "win32" else ROOT / "ffmpeg"
+    _ffmpeg = BUNDLE_DIR / "ffmpeg.exe" if sys.platform == "win32" else BUNDLE_DIR / "ffmpeg"
     if _ffmpeg.exists():
-        os.environ["PATH"] = str(ROOT) + os.pathsep + os.environ.get("PATH", "")
+        os.environ["PATH"] = str(BUNDLE_DIR) + os.pathsep + os.environ.get("PATH", "")
+    # Em modo compilado, a raiz de trabalho é a pasta onde o executável está
+    ROOT = Path(sys.executable).parent
+    # Config do usuário tem preferência; fallback para a empacotada no bundle
+    USER_CONFIG_PATH = ROOT / "config.toml"
+    BUNDLED_CONFIG_PATH = Path(__file__).with_name("config.toml")
+    CONFIG_PATH = USER_CONFIG_PATH if USER_CONFIG_PATH.exists() else BUNDLED_CONFIG_PATH
 else:
     # core/ -> transcritor/ -> src/ -> raiz do projeto
     ROOT = Path(__file__).resolve().parents[2]
+    CONFIG_PATH = Path(__file__).with_name("config.toml")
 
 INBOX = ROOT / "inbox"
 OUTPUT = ROOT / "output"
-CONFIG_PATH = Path(__file__).with_name("config.toml")
 
 AUDIO_EXT = {".mp3", ".mp4", ".m4a", ".wav", ".ogg", ".flac", ".aac", ".webm", ".mkv", ".mov"}
 
@@ -143,8 +149,11 @@ DEFAULTS = {
 def load_cfg() -> dict:
     cfg = dict(DEFAULTS)
     if CONFIG_PATH.is_file():
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            cfg.update(toml.load(f))
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                cfg.update(toml.load(f))
+        except Exception:
+            pass
     # language pode vir como "auto" -> faster-whisper espera None para detectar.
     if str(cfg.get("language", "")).lower() in ("", "auto", "none"):
         cfg["language"] = None

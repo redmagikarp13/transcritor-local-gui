@@ -6,19 +6,26 @@ import subprocess
 import signal
 import re
 import webbrowser
+import multiprocessing
 from pathlib import Path
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import toml
 
-# Raiz do projeto: gui/ -> transcritor/ -> src/ -> raiz
-ROOT_DIR = Path(__file__).resolve().parents[2]
-SRC_DIR = ROOT_DIR / "src"
-
 # Suporte a PyInstaller frozen
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    ROOT_DIR = Path(sys._MEIPASS)
-    SRC_DIR = ROOT_DIR
+IS_FROZEN = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+if IS_FROZEN:
+    BUNDLE_DIR = Path(sys._MEIPASS)
+    APP_DIR = Path(sys.executable).parent
+    ROOT_DIR = APP_DIR
+    SRC_DIR = BUNDLE_DIR
+    CONFIG_PATH = APP_DIR / "config.toml"
+    BUNDLED_CONFIG_PATH = BUNDLE_DIR / "transcritor" / "core" / "config.toml"
+else:
+    ROOT_DIR = Path(__file__).resolve().parents[2]
+    SRC_DIR = ROOT_DIR / "src"
+    CONFIG_PATH = Path(__file__).resolve().parents[1] / "core" / "config.toml"
+    BUNDLED_CONFIG_PATH = CONFIG_PATH
 
 sys.path.insert(0, str(SRC_DIR))
 
@@ -27,8 +34,6 @@ from transcritor.gui import backend as backend
 # Tema escuro
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
-
-CONFIG_PATH = Path(__file__).resolve().parents[1] / "core" / "config.toml"
 
 class TranscritorLocalGUI(ctk.CTk):
     def __init__(self):
@@ -413,12 +418,9 @@ class TranscritorLocalGUI(ctk.CTk):
         def run():
             try:
                 is_frozen = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
-                log_to_widget(f"[DEBUG] frozen={is_frozen}, executable={sys.executable}")
                 
-                # Se estiver rodando como executável compilado, executa o runner diretamente
+                # Se estiver rodando como executável compilado, executa o runner diretamente no thread
                 if is_frozen:
-                    log_to_widget("[DEBUG] Executando runner diretamente (frozen)")
-                    # Importa o runner do pacote transcritor.gui
                     from transcritor.gui import transcribe_runner as runner
                     runner.run_transcription(
                         files=args.get("files", []),
@@ -430,14 +432,11 @@ class TranscritorLocalGUI(ctk.CTk):
                     self.after(0, log_widget.see, "end")
                     self.after(0, lambda: prog_widget.set(1.0))
                 else:
-                    log_to_widget("[DEBUG] Usando subprocess (desenvolvimento)")
                     # Modo desenvolvimento: usa subprocess
-                    # Importa o transcribe para registrar as DLLs no PATH
                     from transcritor.core import transcribe as tr_module
                     
                     env = os.environ.copy()
                     env["PYTHONPATH"] = str(SRC_DIR)
-                    # Garante que o PATH com as DLLs do CUDA seja passado ao subprocess
                     env["PATH"] = os.environ.get("PATH", "")
                     
                     self.current_process = subprocess.Popen(
@@ -535,21 +534,26 @@ class TranscritorLocalGUI(ctk.CTk):
         self.log_models.see("end")
 
     def load_settings(self):
-        if CONFIG_PATH.exists():
+        target_path = CONFIG_PATH if CONFIG_PATH.exists() else BUNDLED_CONFIG_PATH
+        if target_path.exists():
             try:
-                cfg = toml.load(str(CONFIG_PATH))
+                cfg = toml.load(str(target_path))
                 self.cfg_model.set(cfg.get("model", "medium"))
                 lang = cfg.get("language", "auto")
                 self.cfg_lang.set(lang if lang else "auto")
                 self.cfg_device.set(cfg.get("device", "auto"))
                 self.cfg_compute.set(cfg.get("compute_type", "int8"))
-            except: pass
+            except Exception:
+                pass
 
     def save_settings(self):
         cfg = {}
-        if CONFIG_PATH.exists():
-            try: cfg = toml.load(str(CONFIG_PATH))
-            except: pass
+        target_path = CONFIG_PATH if CONFIG_PATH.exists() else BUNDLED_CONFIG_PATH
+        if target_path.exists():
+            try:
+                cfg = toml.load(str(target_path))
+            except Exception:
+                pass
         cfg["model"] = self.cfg_model.get()
         lang = self.cfg_lang.get()
         cfg["language"] = None if lang == "auto" else lang
@@ -557,10 +561,11 @@ class TranscritorLocalGUI(ctk.CTk):
         cfg["compute_type"] = self.cfg_compute.get()
         try:
             CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with open(CONFIG_PATH, "w") as f: toml.dump(cfg, f)
+            with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+                toml.dump(cfg, f)
             messagebox.showinfo("Sucesso", "Configurações salvas!")
         except Exception as e:
-            messagebox.showerror("Erro", f"Erro: {e}")
+            messagebox.showerror("Erro", f"Erro ao salvar configurações: {e}")
 
     def update_nvidia_status(self):
         """Atualiza o status das bibliotecas NVIDIA na UI."""
@@ -572,18 +577,30 @@ class TranscritorLocalGUI(ctk.CTk):
                 return
             
             if status["installed"]:
-                packages_str = ", ".join([f"{p['name']} {p['version']}" for p in status["packages"]])
+                if status.get("is_frozen"):
+                    status_text = "✓ GPU NVIDIA disponível (Aceleração CUDA ativa)"
+                else:
+                    packages_str = ", ".join([f"{p['name']} {p['version']}" for p in status["packages"]])
+                    status_text = f"✓ Instaladas: {packages_str} ({status['total_size']})"
+                
                 self.after(0, lambda: self.nvidia_status_label.configure(
-                    text=f"✓ Instaladas: {packages_str} ({status['total_size']})",
+                    text=status_text,
                     text_color="#00AA00"))
                 self.after(0, lambda: self.btn_install_nvidia.configure(state="disabled"))
-                self.after(0, lambda: self.btn_uninstall_nvidia.configure(state="normal"))
+                self.after(0, lambda: self.btn_uninstall_nvidia.configure(
+                    state="normal" if not status.get("is_frozen") else "disabled"))
             else:
-                missing = len(status.get("missing", []))
+                if status.get("is_frozen"):
+                    status_text = "✗ CUDA/GPU não detectada (Usando CPU com int8)"
+                else:
+                    missing = len(status.get("missing", []))
+                    status_text = f"✗ Não instaladas ({missing} pacote(s) faltando)"
+                
                 self.after(0, lambda: self.nvidia_status_label.configure(
-                    text=f"✗ Não instaladas ({missing} pacote(s) faltando)",
+                    text=status_text,
                     text_color="orange"))
-                self.after(0, lambda: self.btn_install_nvidia.configure(state="normal"))
+                self.after(0, lambda: self.btn_install_nvidia.configure(
+                    state="normal" if not status.get("is_frozen") else "disabled"))
                 self.after(0, lambda: self.btn_uninstall_nvidia.configure(state="disabled"))
         
         threading.Thread(target=check, daemon=True).start()
@@ -630,5 +647,6 @@ class TranscritorLocalGUI(ctk.CTk):
         threading.Thread(target=do_uninstall, daemon=True).start()
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     app = TranscritorLocalGUI()
     app.mainloop()

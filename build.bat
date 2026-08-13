@@ -40,7 +40,10 @@ pyinstaller --noconfirm --onefile --windowed ^
     --hidden-import faster_whisper ^
     --hidden-import ctranslate2 ^
     --hidden-import tokenizers ^
-    --collect-data faster_whisper ^
+    --hidden-import transcritor.gui.transcribe_runner ^
+    --collect-all customtkinter ^
+    --collect-all faster_whisper ^
+    --collect-all huggingface_hub ^
     --add-data "src\transcritor\core;transcritor\core" ^
     --add-data "src\transcritor\gui;transcritor\gui" ^
     --add-binary "ffmpeg.exe;." ^

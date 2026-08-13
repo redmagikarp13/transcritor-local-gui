@@ -76,15 +76,45 @@ def delete_model(model_size: str) -> bool:
 
 # --- Gerenciamento de Bibliotecas NVIDIA ---
 
+def is_cuda_available() -> bool:
+    """Verifica se há dispositivo CUDA e bibliotecas disponíveis via CTranslate2."""
+    try:
+        import ctranslate2
+        return ctranslate2.get_cuda_device_count() > 0
+    except Exception:
+        return False
+
 def get_nvidia_packages_status() -> dict:
-    """Retorna o status das bibliotecas NVIDIA instaladas."""
+    """Retorna o status das bibliotecas NVIDIA / aceleração CUDA instaladas."""
+    is_frozen = getattr(sys, 'frozen', False)
+    
+    if is_frozen:
+        # No executável compilado, não executa pip (sys.executable é o próprio .exe).
+        # Verifica diretamente se a GPU NVIDIA e o suporte a CUDA estão ativos.
+        cuda_ok = is_cuda_available()
+        return {
+            "installed": cuda_ok,
+            "is_frozen": True,
+            "packages": [{"name": "CUDA GPU", "version": "Disponível"}] if cuda_ok else [],
+            "missing": [] if cuda_ok else ["CUDA Toolkit 12 / DLLs NVIDIA"],
+            "total_size": "Integrado/Sistema"
+        }
+    
+    # Modo desenvolvimento: consulta o ambiente Python local via pip
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "list", "--format=json"],
             capture_output=True, text=True, timeout=30
         )
         if result.returncode != 0:
-            return {"installed": False, "packages": [], "error": "Erro ao consultar pip"}
+            cuda_ok = is_cuda_available()
+            return {
+                "installed": cuda_ok,
+                "is_frozen": False,
+                "packages": [],
+                "missing": [] if cuda_ok else ["nvidia-cublas-cu12", "nvidia-cudnn-cu12"],
+                "total_size": "0 MB"
+            }
         
         import json
         installed_packages = json.loads(result.stdout)
@@ -93,9 +123,11 @@ def get_nvidia_packages_status() -> dict:
         
         for pkg in NVIDIA_PACKAGES:
             pkg_name = pkg.split("==")[0].replace("*", "")
+            norm_pkg_name = pkg_name.lower().replace("-", "").replace("_", "")
             found = False
             for installed in installed_packages:
-                if installed["name"].lower().startswith(pkg_name.lower().replace("-", "")):
+                norm_installed_name = installed["name"].lower().replace("-", "").replace("_", "")
+                if norm_installed_name == norm_pkg_name or norm_installed_name.startswith(norm_pkg_name):
                     nvidia_installed.append({
                         "name": installed["name"],
                         "version": installed["version"]
@@ -107,16 +139,24 @@ def get_nvidia_packages_status() -> dict:
         
         return {
             "installed": len(nvidia_missing) == 0,
+            "is_frozen": False,
             "packages": nvidia_installed,
             "missing": nvidia_missing,
             "total_size": _estimate_nvidia_size(nvidia_installed)
         }
     except Exception as e:
-        return {"installed": False, "packages": [], "error": str(e)}
+        cuda_ok = is_cuda_available()
+        return {
+            "installed": cuda_ok,
+            "is_frozen": False,
+            "packages": [],
+            "missing": [] if cuda_ok else ["nvidia-cublas-cu12", "nvidia-cudnn-cu12"],
+            "total_size": "0 MB",
+            "error": str(e)
+        }
 
 def _estimate_nvidia_size(packages: list) -> str:
     """Estima o tamanho total das bibliotecas NVIDIA instaladas."""
-    # Tamanhos aproximados das wheels
     sizes = {
         "nvidia-cublas-cu12": 553,
         "nvidia-cudnn-cu12": 737,
@@ -134,12 +174,16 @@ def _estimate_nvidia_size(packages: list) -> str:
 
 def install_nvidia_packages(progress_callback=None) -> bool:
     """Instala as bibliotecas NVIDIA necessárias para GPU."""
+    if getattr(sys, 'frozen', False):
+        if progress_callback:
+            progress_callback("No executável compilado, instale o NVIDIA CUDA Toolkit 12 no sistema.")
+        return False
+
     if progress_callback:
         progress_callback("Iniciando instalação das bibliotecas NVIDIA CUDA 12...")
         progress_callback("Isso pode demorar alguns minutos (~1.3 GB)...")
     
     try:
-        packages_str = " ".join(NVIDIA_PACKAGES)
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install"] + NVIDIA_PACKAGES,
             capture_output=True, text=True, timeout=600
@@ -165,13 +209,17 @@ def install_nvidia_packages(progress_callback=None) -> bool:
 
 def uninstall_nvidia_packages(progress_callback=None) -> bool:
     """Desinstala as bibliotecas NVIDIA."""
+    if getattr(sys, 'frozen', False):
+        if progress_callback:
+            progress_callback("Operação não suportada no executável compilado.")
+        return False
+
     if progress_callback:
         progress_callback("Desinstalando bibliotecas NVIDIA...")
     
     try:
-        # Obtém lista de pacotes nvidia instalados
         status = get_nvidia_packages_status()
-        if not status["packages"]:
+        if not status.get("packages"):
             if progress_callback:
                 progress_callback("Nenhuma biblioteca NVIDIA encontrada.")
             return True

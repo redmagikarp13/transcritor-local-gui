@@ -4,42 +4,20 @@
 13 de agosto de 2026
 
 ## Status Atual
-- **Versão:** v1.4.2 (build com debug para diagnosticar problema de múltiplas janelas)
+- **Versão:** v1.4.5 (problema de múltiplas janelas, detecção de CUDA e empacotamento PyInstaller resolvidos)
 - **Branch:** main
-- **Última Release:** v1.4.1
+- **Última Release:** v1.4.4 (antiga com problema)
 
-## Funcionalidades Implementadas
-
-### Gerenciamento de Bibliotecas NVIDIA (v1.4.0)
-- Adicionada seção na aba **Configurações** para gerenciar bibliotecas NVIDIA CUDA
-- **Status:** Mostra se as bibliotecas estão instaladas (verde) ou não (laranja)
-- **Botões:**
-  - "Baixar Bibliotecas (~1.3GB)" - Instala nvidia-cublas-cu12, nvidia-cudnn-cu12, nvidia-cuda-nvrtc-cu12
-  - "Excluir Bibliotecas" - Remove as bibliotecas (com confirmação)
-  - "CUDA Toolkit" - Abre site da NVIDIA para download do CUDA
-- **Vantagem:** Executável compilado fica pequeno (~200MB), usuário baixa bibliotecas sob demanda
-
-### Compatibilidade CUDA
-- Funciona com qualquer versão do CUDA Toolkit instalada (13, 14, etc.)
-- Usa bibliotecas pip (CUDA 12) quando disponíveis
-- Detecta automaticamente CUDA do sistema ou bibliotecas pip
-- **Local das DLLs:** `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\*`
-
-### Execução no Executável Compilado
-- **Problema atual:** Ao transcrever no executável compilado, abre múltiplas janelas
-- **Causa:** O `transcribe_runner` não está sendo importado corretamente no modo frozen
-- **Solução em teste:** v1.4.2 adiciona logs de debug para diagnosticar o problema
-- **Arquivos envolvidos:**
-  - `src/transcritor/gui/main.py` - Método `start_transcription_thread()`
-  - `src/transcritor/gui/transcribe_runner.py` - Runner de transcrição
-  - `.github/workflows/build-releases.yml` - PyInstaller com `--hidden-import=transcritor.gui.transcribe_runner`
-
-## Problemas Conhecidos
-
-### 1. Múltiplas Janelas no Executável (v1.4.2)
-- **Sintoma:** Ao clicar em "Transcrever" no executável compilado, abre várias janelas
-- **Debug:** v1.4.2 adiciona logs `[DEBUG]` para identificar se está caindo no subprocess
-- **Próximo passo:** Analisar logs do v1.4.2 para determinar causa raiz
+## Problema Resolvido: Múltiplas Janelas no Executável
+- **Causa Real Identificada:**
+  1. No executável compilado (`sys.frozen`), `backend.get_nvidia_packages_status()` tentava rodar `subprocess.run([sys.executable, "-m", "pip", ...])`. Como `sys.executable` no PyInstaller é o próprio `TranscritorLocal.exe`, o programa chamava a si mesmo recursivamente em background, abrindo janelas infinitas no startup.
+  2. Falta de `multiprocessing.freeze_support()` no início de `if __name__ == "__main__":`.
+  3. No modo compilado, `ROOT_DIR` apontava para `%TEMP%/_MEIPASS` temporário, perdendo arquivos de saída e arquivos `config.toml` salvos.
+- **Solução Aplicada:**
+  1. `backend.py` agora detecta disponibilidade de CUDA via `ctranslate2.get_cuda_device_count()` e DLLs diretas quando `sys.frozen == True`, sem chamar `pip` via subprocess.
+  2. Adicionado `multiprocessing.freeze_support()` em `main.py`.
+  3. `ROOT_DIR` e `CONFIG_PATH` agora apontam para `Path(sys.executable).parent` quando congelado, garantindo que `output/` e configurações fiquem persistentes ao lado do `.exe`.
+  4. Workflows e scripts de build atualizados com `--collect-all customtkinter --collect-all faster_whisper --collect-all huggingface_hub`.
 
 ### 2. CUDA 13 vs CUDA 12
 - **Problema:** faster-whisper/CTranslate2 precisa de CUDA 12, mas usuário pode ter CUDA 13
