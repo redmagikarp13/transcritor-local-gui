@@ -387,32 +387,53 @@ class TranscritorLocalGUI(ctk.CTk):
     def start_transcription_thread(self, args, log_widget, btn_run, prog_widget, btn_pause, btn_stop):
         runner_path = str(Path(__file__).resolve().parent / "transcribe_runner.py")
 
+        def log_to_widget(msg):
+            """Callback para enviar logs para o widget de log da GUI."""
+            self.after(0, lambda m=msg: log_widget.insert("end", m + "\n"))
+            self.after(0, log_widget.see, "end")
+
         def run():
             try:
-                self.current_process = subprocess.Popen(
-                    [sys.executable, "-u", runner_path],
-                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
-                )
-                self.current_process.stdin.write(json.dumps(args))
-                self.current_process.stdin.close()
+                # Se estiver rodando como executável compilado, executa o runner diretamente
+                if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                    # Importa e executa o runner no mesmo processo
+                    sys.path.insert(0, str(Path(__file__).resolve().parent))
+                    import transcribe_runner as runner
+                    runner.run_transcription(
+                        files=args.get("files", []),
+                        output_dir=args.get("output_dir"),
+                        config_override=args.get("config", {}),
+                        log_callback=log_to_widget
+                    )
+                    self.after(0, lambda: log_widget.insert("end", f"\n[Finalizado]\n"))
+                    self.after(0, log_widget.see, "end")
+                    self.after(0, lambda: prog_widget.set(1.0))
+                else:
+                    # Modo desenvolvimento: usa subprocess
+                    self.current_process = subprocess.Popen(
+                        [sys.executable, "-u", runner_path],
+                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
+                    )
+                    self.current_process.stdin.write(json.dumps(args))
+                    self.current_process.stdin.close()
 
-                buffer = ""
-                while True:
-                    char = self.current_process.stdout.read(1)
-                    if not char: break
-                    if char == '\r':
-                        self.handle_progress_line(buffer, log_widget, prog_widget, is_cr=True)
-                        buffer = ""
-                    elif char == '\n':
-                        self.handle_progress_line(buffer, log_widget, prog_widget, is_cr=False)
-                        buffer = ""
-                    else:
-                        buffer += char
+                    buffer = ""
+                    while True:
+                        char = self.current_process.stdout.read(1)
+                        if not char: break
+                        if char == '\r':
+                            self.handle_progress_line(buffer, log_widget, prog_widget, is_cr=True)
+                            buffer = ""
+                        elif char == '\n':
+                            self.handle_progress_line(buffer, log_widget, prog_widget, is_cr=False)
+                            buffer = ""
+                        else:
+                            buffer += char
 
-                self.current_process.wait()
-                self.after(0, lambda: log_widget.insert("end", f"\n[Finalizado]\n"))
-                self.after(0, log_widget.see, "end")
-                self.after(0, lambda: prog_widget.set(1.0))
+                    self.current_process.wait()
+                    self.after(0, lambda: log_widget.insert("end", f"\n[Finalizado]\n"))
+                    self.after(0, log_widget.see, "end")
+                    self.after(0, lambda: prog_widget.set(1.0))
             except Exception as e:
                 self.after(0, lambda: log_widget.insert("end", f"\nErro: {e}\n"))
             finally:
