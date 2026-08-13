@@ -414,9 +414,8 @@ class TranscritorLocalGUI(ctk.CTk):
             try:
                 # Se estiver rodando como executável compilado, executa o runner diretamente
                 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-                    # Importa e executa o runner no mesmo processo
-                    sys.path.insert(0, str(Path(__file__).resolve().parent))
-                    import transcribe_runner as runner
+                    # Importa o runner do pacote transcritor.gui
+                    from transcritor.gui import transcribe_runner as runner
                     runner.run_transcription(
                         files=args.get("files", []),
                         output_dir=args.get("output_dir"),

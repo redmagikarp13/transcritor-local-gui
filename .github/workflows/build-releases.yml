@@ -52,12 +52,12 @@ jobs:
     - name: Build with PyInstaller (Windows)
       if: runner.os == 'Windows'
       run: |
-        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "src/transcritor/core;transcritor/core/" --add-data "src/transcritor/gui;transcritor/gui/" --add-binary "ffmpeg.exe;." "src/transcritor/gui/main.py"
+        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --hidden-import=transcritor.gui.transcribe_runner --collect-data faster_whisper --add-data "src/transcritor/core;transcritor/core/" --add-data "src/transcritor/gui;transcritor/gui/" --add-binary "ffmpeg.exe;." "src/transcritor/gui/main.py"
 
     - name: Build with PyInstaller (Mac)
       if: runner.os == 'macOS'
       run: |
-        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal-Mac" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --collect-data faster_whisper --add-data "src/transcritor/core:transcritor/core/" --add-data "src/transcritor/gui:transcritor/gui/" --add-binary "ffmpeg:." "src/transcritor/gui/main.py"
+        pyinstaller --noconfirm --onefile --windowed --name "TranscritorLocal-Mac" --hidden-import=faster_whisper --hidden-import=ctranslate2 --hidden-import=tokenizers --hidden-import=transcritor.gui.transcribe_runner --collect-data faster_whisper --add-data "src/transcritor/core:transcritor/core/" --add-data "src/transcritor/gui:transcritor/gui/" --add-binary "ffmpeg:." "src/transcritor/gui/main.py"
         cd dist
         zip -r TranscritorLocal-Mac.zip "TranscritorLocal-Mac.app"
 
