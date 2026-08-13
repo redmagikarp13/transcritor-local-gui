@@ -410,9 +410,12 @@ class TranscritorLocalGUI(ctk.CTk):
                     self.after(0, lambda: prog_widget.set(1.0))
                 else:
                     # Modo desenvolvimento: usa subprocess
+                    env = os.environ.copy()
+                    env["PYTHONPATH"] = str(SRC_DIR)
                     self.current_process = subprocess.Popen(
                         [sys.executable, "-u", runner_path],
-                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
+                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
+                        text=True, bufsize=1, env=env
                     )
                     self.current_process.stdin.write(json.dumps(args))
                     self.current_process.stdin.close()
