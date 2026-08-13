@@ -412,8 +412,12 @@ class TranscritorLocalGUI(ctk.CTk):
 
         def run():
             try:
+                is_frozen = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+                log_to_widget(f"[DEBUG] frozen={is_frozen}, executable={sys.executable}")
+                
                 # Se estiver rodando como executável compilado, executa o runner diretamente
-                if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                if is_frozen:
+                    log_to_widget("[DEBUG] Executando runner diretamente (frozen)")
                     # Importa o runner do pacote transcritor.gui
                     from transcritor.gui import transcribe_runner as runner
                     runner.run_transcription(
@@ -426,6 +430,7 @@ class TranscritorLocalGUI(ctk.CTk):
                     self.after(0, log_widget.see, "end")
                     self.after(0, lambda: prog_widget.set(1.0))
                 else:
+                    log_to_widget("[DEBUG] Usando subprocess (desenvolvimento)")
                     # Modo desenvolvimento: usa subprocess
                     # Importa o transcribe para registrar as DLLs no PATH
                     from transcritor.core import transcribe as tr_module
