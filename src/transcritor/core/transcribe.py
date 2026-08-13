@@ -13,6 +13,32 @@ import toml
 from collections import namedtuple
 from pathlib import Path
 
+# Registrar DLLs do CUDA no PATH (Windows) antes de importar faster_whisper
+def _register_nvidia_dlls():
+    """Adiciona as DLLs do NVIDIA CUDA ao PATH para o CTranslate2 encontrar."""
+    if sys.platform != "win32":
+        return
+    
+    # Encontra o site-packages do Python
+    try:
+        import site
+        site_packages = Path(site.getsitepackages()[0])
+    except:
+        site_packages = Path(sys.executable).parent / "Lib" / "site-packages"
+    
+    # Paths das DLLs do NVIDIA CUDA
+    nvidia_paths = []
+    for pkg in ["cublas", "cudnn", "cuda_nvrtc", "cuda_runtime"]:
+        pkg_path = site_packages / "nvidia" / pkg / "bin"
+        if pkg_path.exists():
+            nvidia_paths.append(str(pkg_path))
+    
+    if nvidia_paths:
+        current_path = os.environ.get("PATH", "")
+        os.environ["PATH"] = os.pathsep.join(nvidia_paths) + os.pathsep + current_path
+
+_register_nvidia_dlls()
+
 from faster_whisper import WhisperModel
 
 # Segmento normalizado
@@ -87,7 +113,9 @@ def load_model(cfg: dict) -> WhisperModel:
             print(f"Modelo '{cfg['model']}' carregado em {device} ({compute_type}) com {threads} threads.")
             return model
         except Exception as e:
-            print(f"[aviso] GPU indisponível ou falhou ({e}).")
+            print(f"[aviso] GPU indisponível ou falhou: {e}")
+            print("[aviso] Para usar GPU, instale as bibliotecas NVIDIA:")
+            print("         pip install nvidia-cublas-cu12 \"nvidia-cudnn-cu12==9.*\"")
             print("[aviso] Recaindo para device='cpu', compute_type='int8'.")
 
     model = WhisperModel(cfg["model"], device="cpu", compute_type="int8", cpu_threads=threads)
