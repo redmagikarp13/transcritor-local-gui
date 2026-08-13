@@ -15,15 +15,22 @@ from pathlib import Path
 
 # Registrar DLLs do CUDA no PATH (Windows) antes de importar faster_whisper
 def _register_nvidia_dlls():
-    """Adiciona as DLLs do NVIDIA CUDA ao PATH para o CTranslate2 encontrar."""
+    """Adiciona as DLLs do NVIDIA CUDA ao PATH para o CTranslate2 encontrar.
+    
+    Procura em múltiplos locais:
+    1. Bibliotecas pip (nvidia-cublas-cu12, etc.) no site-packages
+    2. CUDA Toolkit instalado no sistema (ex: C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\...)
+    3. DLLs já no PATH do sistema
+    """
     if sys.platform != "win32":
         return
     
-    # Encontra o site-packages do Python
-    # Tenta vários métodos porque o comportamento varia entre ambientes
+    nvidia_paths = []
+    
+    # Método 1: Procura nas bibliotecas pip do site-packages
     site_packages = None
     
-    # Método 1: site.getsitepackages()
+    # Tenta vários métodos para encontrar o site-packages
     try:
         import site
         for sp in site.getsitepackages():
@@ -34,32 +41,67 @@ def _register_nvidia_dlls():
     except:
         pass
     
-    # Método 2: Caminho relativo ao executável Python
     if site_packages is None:
         candidate = Path(sys.executable).parent / "Lib" / "site-packages"
         if candidate.exists() and (candidate / "nvidia").exists():
             site_packages = candidate
     
-    # Método 3: Para .venv, o site-packages está em .venv/Lib/site-packages
     if site_packages is None:
         candidate = Path(sys.executable).parent.parent / "Lib" / "site-packages"
         if candidate.exists() and (candidate / "nvidia").exists():
             site_packages = candidate
     
-    if site_packages is None:
-        return
+    if site_packages:
+        for pkg in ["cublas", "cudnn", "cuda_nvrtc", "cuda_runtime"]:
+            pkg_path = site_packages / "nvidia" / pkg / "bin"
+            if pkg_path.exists():
+                nvidia_paths.append(str(pkg_path))
     
-    # Paths das DLLs do NVIDIA CUDA
-    nvidia_paths = []
-    for pkg in ["cublas", "cudnn", "cuda_nvrtc", "cuda_runtime"]:
-        pkg_path = site_packages / "nvidia" / pkg / "bin"
-        if pkg_path.exists():
-            nvidia_paths.append(str(pkg_path))
+    # Método 2: Procura no CUDA Toolkit instalado no sistema
+    cuda_base_paths = [
+        Path(os.environ.get("CUDA_PATH", "")),
+        Path("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA"),
+    ]
+    
+    # Adiciona versões comuns do CUDA
+    for cuda_base in cuda_base_paths:
+        if cuda_base.exists():
+            # Se é o diretório base, procura subdiretórios de versão
+            if "Toolkit" in str(cuda_base):
+                for version_dir in cuda_base.iterdir():
+                    if version_dir.is_dir():
+                        bin_path = version_dir / "bin"
+                        if bin_path.exists():
+                            nvidia_paths.append(str(bin_path))
+            else:
+                # É o CUDA_PATH direto
+                bin_path = cuda_base / "bin"
+                if bin_path.exists():
+                    nvidia_paths.append(str(bin_path))
+    
+    # Método 3: Adiciona paths do PATH atual que contêm DLLs NVIDIA
+    current_path = os.environ.get("PATH", "")
+    for path in current_path.split(os.pathsep):
+        path = Path(path)
+        if path.exists() and "nvidia" in str(path).lower():
+            nvidia_paths.append(str(path))
+        # Também verifica se contém cublas ou cudnn
+        if path.exists():
+            try:
+                files = list(path.glob("cublas*.dll")) + list(path.glob("cudnn*.dll"))
+                if files:
+                    nvidia_paths.append(str(path))
+            except:
+                pass
+    
+    # Remove duplicatas e paths vazios
+    nvidia_paths = list(set(p for p in nvidia_paths if p))
     
     if nvidia_paths:
-        current_path = os.environ.get("PATH", "")
+        # Adiciona ao PATH
         os.environ["PATH"] = os.pathsep.join(nvidia_paths) + os.pathsep + current_path
-        # Também usa add_dll_directory se disponível (Python 3.8+)
+        
+        # Usa add_dll_directory se disponível (Python 3.8+)
         if hasattr(os, "add_dll_directory"):
             for p in nvidia_paths:
                 try:
