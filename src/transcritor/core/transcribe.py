@@ -20,11 +20,34 @@ def _register_nvidia_dlls():
         return
     
     # Encontra o site-packages do Python
+    # Tenta vários métodos porque o comportamento varia entre ambientes
+    site_packages = None
+    
+    # Método 1: site.getsitepackages()
     try:
         import site
-        site_packages = Path(site.getsitepackages()[0])
+        for sp in site.getsitepackages():
+            p = Path(sp)
+            if (p / "nvidia").exists():
+                site_packages = p
+                break
     except:
-        site_packages = Path(sys.executable).parent / "Lib" / "site-packages"
+        pass
+    
+    # Método 2: Caminho relativo ao executável Python
+    if site_packages is None:
+        candidate = Path(sys.executable).parent / "Lib" / "site-packages"
+        if candidate.exists() and (candidate / "nvidia").exists():
+            site_packages = candidate
+    
+    # Método 3: Para .venv, o site-packages está em .venv/Lib/site-packages
+    if site_packages is None:
+        candidate = Path(sys.executable).parent.parent / "Lib" / "site-packages"
+        if candidate.exists() and (candidate / "nvidia").exists():
+            site_packages = candidate
+    
+    if site_packages is None:
+        return
     
     # Paths das DLLs do NVIDIA CUDA
     nvidia_paths = []
@@ -36,6 +59,13 @@ def _register_nvidia_dlls():
     if nvidia_paths:
         current_path = os.environ.get("PATH", "")
         os.environ["PATH"] = os.pathsep.join(nvidia_paths) + os.pathsep + current_path
+        # Também usa add_dll_directory se disponível (Python 3.8+)
+        if hasattr(os, "add_dll_directory"):
+            for p in nvidia_paths:
+                try:
+                    os.add_dll_directory(p)
+                except:
+                    pass
 
 _register_nvidia_dlls()
 
