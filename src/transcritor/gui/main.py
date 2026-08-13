@@ -410,8 +410,14 @@ class TranscritorLocalGUI(ctk.CTk):
                     self.after(0, lambda: prog_widget.set(1.0))
                 else:
                     # Modo desenvolvimento: usa subprocess
+                    # Importa o transcribe para registrar as DLLs no PATH
+                    from transcritor.core import transcribe as tr_module
+                    
                     env = os.environ.copy()
                     env["PYTHONPATH"] = str(SRC_DIR)
+                    # Garante que o PATH com as DLLs do CUDA seja passado ao subprocess
+                    env["PATH"] = os.environ.get("PATH", "")
+                    
                     self.current_process = subprocess.Popen(
                         [sys.executable, "-u", runner_path],
                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
