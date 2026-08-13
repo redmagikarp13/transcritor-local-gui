@@ -15,99 +15,151 @@ from pathlib import Path
 
 # Registrar DLLs do CUDA no PATH (Windows) antes de importar faster_whisper
 def _register_nvidia_dlls():
-    """Adiciona as DLLs do NVIDIA CUDA ao PATH para o CTranslate2 encontrar.
+    """Adiciona as DLLs do NVIDIA CUDA ao PATH e ao carregador de DLLs do Windows para o CTranslate2 encontrar.
     
     Procura em múltiplos locais:
-    1. Bibliotecas pip (nvidia-cublas-cu12, etc.) no site-packages
-    2. CUDA Toolkit instalado no sistema (ex: C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\...)
-    3. DLLs já no PATH do sistema
+    1. Bibliotecas pip instaladas no ambiente atual ou globalmente (%APPDATA%\\Python, %LOCALAPPDATA%\\Programs\\Python, etc.)
+    2. Ambientes virtuais (.venv, venv) próximos ao executável ou workspace
+    3. Pastas locais (nvidia/, cuda/, bin/ ou DLLs na mesma pasta)
+    4. CUDA Toolkit instalado no sistema (CUDA_PATH e C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\...)
+    5. Diretórios já no PATH do sistema
     """
     if sys.platform != "win32":
-        return
+        return []
     
     nvidia_paths = []
+    candidates = []
     
-    # Método 1: Procura nas bibliotecas pip do site-packages
-    site_packages = None
-    
-    # Tenta vários métodos para encontrar o site-packages
+    # 1. Sys paths e site-packages padrão
     try:
         import site
-        for sp in site.getsitepackages():
-            p = Path(sp)
-            if (p / "nvidia").exists():
-                site_packages = p
-                break
-    except:
+        if hasattr(site, "getsitepackages"):
+            for sp in site.getsitepackages():
+                candidates.append(Path(sp))
+        if hasattr(site, "getusersitepackages"):
+            candidates.append(Path(site.getusersitepackages()))
+    except Exception:
         pass
+
+    try:
+        candidates.append(Path(sys.executable).parent / "Lib" / "site-packages")
+        candidates.append(Path(sys.executable).parent.parent / "Lib" / "site-packages")
+        candidates.append(Path(sys.prefix) / "Lib" / "site-packages")
+        if hasattr(sys, "base_prefix"):
+            candidates.append(Path(sys.base_prefix) / "Lib" / "site-packages")
+    except Exception:
+        pass
+
+    # 2. Caminhos do Python no usuário (AppData / LocalAppData) e TranscritorLocal
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        try:
+            candidates.extend(Path(appdata).glob("Python/Python*/site-packages"))
+            candidates.append(Path(appdata) / "TranscritorLocal")
+            candidates.append(Path(appdata) / "TranscritorLocal" / "nvidia")
+        except Exception:
+            pass
+
+    localappdata = os.environ.get("LOCALAPPDATA")
+    if localappdata:
+        try:
+            candidates.extend(Path(localappdata).glob("Programs/Python/Python*/Lib/site-packages"))
+            candidates.append(Path(localappdata) / "TranscritorLocal")
+            candidates.append(Path(localappdata) / "TranscritorLocal" / "nvidia")
+        except Exception:
+            pass
+
+    # 3. Instalações globais comuns C:\Python*
+    try:
+        candidates.extend(Path("C:/").glob("Python*/Lib/site-packages"))
+    except Exception:
+        pass
+
+    # 4. Ambientes virtuais e pastas próximas ao executável / cwd
+    base_dirs = [Path.cwd(), Path(sys.executable).parent, Path(sys.executable).parent.parent]
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        base_dirs.append(Path(sys._MEIPASS))
     
-    if site_packages is None:
-        candidate = Path(sys.executable).parent / "Lib" / "site-packages"
-        if candidate.exists() and (candidate / "nvidia").exists():
-            site_packages = candidate
-    
-    if site_packages is None:
-        candidate = Path(sys.executable).parent.parent / "Lib" / "site-packages"
-        if candidate.exists() and (candidate / "nvidia").exists():
-            site_packages = candidate
-    
-    if site_packages:
-        for pkg in ["cublas", "cudnn", "cuda_nvrtc", "cuda_runtime"]:
-            pkg_path = site_packages / "nvidia" / pkg / "bin"
-            if pkg_path.exists():
-                nvidia_paths.append(str(pkg_path))
-    
-    # Método 2: Procura no CUDA Toolkit instalado no sistema
+    for base in base_dirs:
+        candidates.append(base / ".venv" / "Lib" / "site-packages")
+        candidates.append(base / "venv" / "Lib" / "site-packages")
+        candidates.append(base / "nvidia")
+        candidates.append(base / "cuda" / "bin")
+        candidates.append(base / "bin")
+        candidates.append(base)
+
+    # 5. CUDA Toolkit instalado no sistema
     cuda_base_paths = [
         Path(os.environ.get("CUDA_PATH", "")),
         Path("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA"),
     ]
-    
-    # Adiciona versões comuns do CUDA
+    for env_k, env_v in os.environ.items():
+        if env_k.startswith("CUDA_PATH_") and env_v:
+            cuda_base_paths.append(Path(env_v))
+
     for cuda_base in cuda_base_paths:
-        if cuda_base.exists():
-            # Se é o diretório base, procura subdiretórios de versão
+        if cuda_base and cuda_base.exists():
             if "Toolkit" in str(cuda_base):
-                for version_dir in cuda_base.iterdir():
-                    if version_dir.is_dir():
-                        bin_path = version_dir / "bin"
-                        if bin_path.exists():
-                            nvidia_paths.append(str(bin_path))
+                try:
+                    for version_dir in cuda_base.iterdir():
+                        if version_dir.is_dir():
+                            for sub in ["bin", "bin/x64", "nvvm/bin"]:
+                                p = version_dir / sub
+                                if p.exists():
+                                    nvidia_paths.append(str(p))
+                except Exception:
+                    pass
             else:
-                # É o CUDA_PATH direto
-                bin_path = cuda_base / "bin"
-                if bin_path.exists():
-                    nvidia_paths.append(str(bin_path))
-    
-    # Método 3: Adiciona paths do PATH atual que contêm DLLs NVIDIA
+                for sub in ["bin", "bin/x64", "nvvm/bin"]:
+                    p = cuda_base / sub
+                    if p.exists():
+                        nvidia_paths.append(str(p))
+
+    # Processa candidatos
+    for c in set(candidates):
+        if not c or not c.exists():
+            continue
+        nvidia_root = c / "nvidia" if (c / "nvidia").exists() else (c if c.name == "nvidia" else None)
+        if nvidia_root and nvidia_root.is_dir():
+            for pkg in ["cublas", "cudnn", "cuda_nvrtc", "cuda_runtime"]:
+                bin_dir = nvidia_root / pkg / "bin"
+                if bin_dir.exists():
+                    nvidia_paths.append(str(bin_dir))
+        try:
+            if list(c.glob("cublas*.dll")) or list(c.glob("cudnn*.dll")):
+                nvidia_paths.append(str(c))
+        except Exception:
+            pass
+
+    # 6. PATH do sistema
     current_path = os.environ.get("PATH", "")
-    for path in current_path.split(os.pathsep):
-        path = Path(path)
-        if path.exists() and "nvidia" in str(path).lower():
-            nvidia_paths.append(str(path))
-        # Também verifica se contém cublas ou cudnn
-        if path.exists():
-            try:
-                files = list(path.glob("cublas*.dll")) + list(path.glob("cudnn*.dll"))
-                if files:
-                    nvidia_paths.append(str(path))
-            except:
-                pass
-    
-    # Remove duplicatas e paths vazios
-    nvidia_paths = list(set(p for p in nvidia_paths if p))
-    
+    for path_str in current_path.split(os.pathsep):
+        if not path_str:
+            continue
+        p = Path(path_str)
+        if p.exists():
+            if "nvidia" in str(p).lower():
+                nvidia_paths.append(str(p))
+            else:
+                try:
+                    if list(p.glob("cublas*.dll")) or list(p.glob("cudnn*.dll")):
+                        nvidia_paths.append(str(p))
+                except Exception:
+                    pass
+
+    # Remove duplicatas e paths inexistentes
+    nvidia_paths = list(set(p for p in nvidia_paths if p and Path(p).is_dir()))
+
     if nvidia_paths:
-        # Adiciona ao PATH
         os.environ["PATH"] = os.pathsep.join(nvidia_paths) + os.pathsep + current_path
-        
-        # Usa add_dll_directory se disponível (Python 3.8+)
         if hasattr(os, "add_dll_directory"):
             for p in nvidia_paths:
                 try:
                     os.add_dll_directory(p)
-                except:
+                except Exception:
                     pass
+
+    return nvidia_paths
 
 _register_nvidia_dlls()
 
@@ -181,7 +233,7 @@ def fmt_hms(seconds: float) -> str:
 def load_model(cfg: dict) -> WhisperModel:
     """Carrega o WhisperModel com fallback automático de GPU para CPU.
 
-    Se device='cuda' (ou 'auto') falhar ao carregar — por falta de cuDNN/cuBLAS,
+    Se device='cuda' (ou 'auto') falhar ao carregar ou executar teste — por falta de cuDNN/cuBLAS,
     VRAM insuficiente ou GPU ausente — recai para device='cpu', compute_type='int8'.
     """
     device = cfg.get("device", "auto")
@@ -191,13 +243,21 @@ def load_model(cfg: dict) -> WhisperModel:
     if device != "cpu":
         try:
             model = WhisperModel(cfg["model"], device=device, compute_type=compute_type, cpu_threads=threads)
+            
+            # Validação imediata (warm-up) para garantir que cuBLAS/cuDNN estão presentes e funcionais
+            if device in ("cuda", "auto"):
+                import numpy as np
+                import ctranslate2
+                dummy = ctranslate2.StorageView.from_array(np.zeros((1, 80, 3000), dtype=np.float32))
+                model.model.encode(dummy)
+
             print(f"Modelo '{cfg['model']}' carregado em {device} ({compute_type}) com {threads} threads.")
             return model
         except Exception as e:
-            print(f"[aviso] GPU indisponível ou falhou: {e}")
+            print(f"[aviso] GPU indisponível ou DLLs ausentes: {e}")
             print("[aviso] Para usar GPU, instale as bibliotecas NVIDIA:")
             print("         pip install nvidia-cublas-cu12 \"nvidia-cudnn-cu12==9.*\"")
-            print("[aviso] Recaindo para device='cpu', compute_type='int8'.")
+            print("[aviso] Recaindo automaticamente para device='cpu', compute_type='int8'.")
 
     model = WhisperModel(cfg["model"], device="cpu", compute_type="int8", cpu_threads=threads)
     print(f"Modelo '{cfg['model']}' carregado em cpu (int8) usando {threads} threads.")
@@ -235,14 +295,26 @@ def transcribe_one(path: Path, cfg: dict, model: WhisperModel = None) -> None:
 
     print(f"Usando modelo faster-whisper: {cfg['model']}", flush=True)
 
-    segments_iter, info = model.transcribe(str(path), **kwargs)
-    print(f"Idioma detectado: {info.language} (prob {info.language_probability:.2f})", flush=True)
+    def _execute_transcribe(active_model):
+        segments_iter, info = active_model.transcribe(str(path), **kwargs)
+        print(f"Idioma detectado: {info.language} (prob {info.language_probability:.2f})", flush=True)
+        all_segs = []
+        for seg in segments_iter:
+            all_segs.append(Seg(seg.start, seg.end, seg.text.strip()))
+            print(f"  [{fmt_hms(seg.start)} --> {fmt_hms(seg.end)}] {seg.text.strip()}", flush=True)
+        return all_segs
 
-    all_segs = []
-    for seg in segments_iter:
-        all_segs.append(Seg(seg.start, seg.end, seg.text.strip()))
-        # Print em tempo real para a GUI capturar
-        print(f"  [{fmt_hms(seg.start)} --> {fmt_hms(seg.end)}] {seg.text.strip()}", flush=True)
+    try:
+        all_segs = _execute_transcribe(model)
+    except Exception as e:
+        err_msg = str(e).lower()
+        if any(k in err_msg for k in ["cublas", "cudnn", "cuda", "out of memory", "driver", "failed to load", "not found"]):
+            print(f"  [aviso] Falha na execução via GPU ({e}). Alternando para CPU...", flush=True)
+            threads = os.cpu_count() or 4
+            cpu_model = WhisperModel(cfg["model"], device="cpu", compute_type="int8", cpu_threads=threads)
+            all_segs = _execute_transcribe(cpu_model)
+        else:
+            raise
 
     if not all_segs:
         print("  [aviso] nenhum segmento de fala detectado.")

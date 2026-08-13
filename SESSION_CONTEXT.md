@@ -4,25 +4,19 @@
 13 de agosto de 2026
 
 ## Status Atual
-- **Versão:** v1.4.5 (problema de múltiplas janelas, detecção de CUDA e empacotamento PyInstaller resolvidos)
+- **Versão:** v1.4.6 (gerenciador completo de DLLs CUDA 12: download direto via PyPI ou pip, atualização, exclusão e verificação em tempo real)
 - **Branch:** main
-- **Última Release:** v1.4.4 (antiga com problema)
+- **Última Release:** v1.4.5
 
-## Problema Resolvido: Múltiplas Janelas no Executável
-- **Causa Real Identificada:**
-  1. No executável compilado (`sys.frozen`), `backend.get_nvidia_packages_status()` tentava rodar `subprocess.run([sys.executable, "-m", "pip", ...])`. Como `sys.executable` no PyInstaller é o próprio `TranscritorLocal.exe`, o programa chamava a si mesmo recursivamente em background, abrindo janelas infinitas no startup.
-  2. Falta de `multiprocessing.freeze_support()` no início de `if __name__ == "__main__":`.
-  3. No modo compilado, `ROOT_DIR` apontava para `%TEMP%/_MEIPASS` temporário, perdendo arquivos de saída e arquivos `config.toml` salvos.
-- **Solução Aplicada:**
-  1. `backend.py` agora detecta disponibilidade de CUDA via `ctranslate2.get_cuda_device_count()` e DLLs diretas quando `sys.frozen == True`, sem chamar `pip` via subprocess.
-  2. Adicionado `multiprocessing.freeze_support()` em `main.py`.
-  3. `ROOT_DIR` e `CONFIG_PATH` agora apontam para `Path(sys.executable).parent` quando congelado, garantindo que `output/` e configurações fiquem persistentes ao lado do `.exe`.
-  4. Workflows e scripts de build atualizados com `--collect-all customtkinter --collect-all faster_whisper --collect-all huggingface_hub`.
-
-### 2. CUDA 13 vs CUDA 12
-- **Problema:** faster-whisper/CTranslate2 precisa de CUDA 12, mas usuário pode ter CUDA 13
-- **Solução:** Instalar bibliotecas pip do NVIDIA (CUDA 12) que funcionam junto com CUDA 13
-- **Comando:** `pip install nvidia-cublas-cu12 "nvidia-cudnn-cu12==9.*"`
+## Problema Resolvido: Gerenciamento de DLLs CUDA 12 (cuBLAS / cuDNN)
+- **Contexto:** O faster-whisper/CTranslate2 requer especificamente as bibliotecas do CUDA 12, mesmo quando o usuário tem o CUDA Toolkit 13 instalado no sistema.
+- **Solução Completa Implementada:**
+  1. **Aba Configurações:** Seção dedicada para *Aceleração por Placa de Vídeo (NVIDIA CUDA 12)* com exibição em tempo real do status da GPU e das bibliotecas.
+  2. **Baixar / Atualizar DLLs (~1.3 GB):** Baixa via `pip install --upgrade` ou via download direto das wheels do PyPI (extraindo os binários em `%LOCALAPPDATA%\TranscritorLocal\nvidia`), com barra/percentual de progresso em tempo real.
+  3. **Excluir DLLs:** Botão para desinstalar e excluir pastas locais das DLLs, liberando ~1.3 GB de espaço em disco e voltando para a CPU de forma segura.
+  4. **Verificar Status:** Botão para re-escanear a disponibilidade de GPU e DLLs cuBLAS/cuDNN a qualquer momento.
+  5. **Busca de DLLs Abrangente:** `_register_nvidia_dlls()` varre automaticamente o `%LOCALAPPDATA%\TranscritorLocal\nvidia`, `%APPDATA%\Python`, `.venv`, pastas locais e `CUDA_PATH`.
+  6. **Fallback Automático e Resiliente:** Se faltar qualquer biblioteca ou a GPU falhar, `load_model()` e `transcribe_one()` recaem instantaneamente para CPU (`int8`) sem travar a aplicação.
 
 ## Estrutura do Código
 

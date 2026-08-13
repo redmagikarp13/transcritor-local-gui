@@ -29,6 +29,13 @@ else:
 
 sys.path.insert(0, str(SRC_DIR))
 
+# Registrar DLLs NVIDIA CUDA no PATH e Windows DLL Loader
+try:
+    from transcritor.core.transcribe import _register_nvidia_dlls
+    _register_nvidia_dlls()
+except Exception:
+    pass
+
 from transcritor.gui import backend as backend
 
 # Tema escuro
@@ -224,24 +231,25 @@ class TranscritorLocalGUI(ctk.CTk):
 
         # Grupo CUDA
         g_cuda = self.create_group(self.frames["settings"], 2)
-        ctk.CTkLabel(g_cuda, text="Aceleração por Placa de Vídeo (NVIDIA)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, pady=(15, 5), padx=20, sticky="w")
-        ctk.CTkLabel(g_cuda, text="Para usar a GPU, você precisa das bibliotecas NVIDIA CUDA 12.\nFunciona com qualquer versão do CUDA Toolkit instalada no sistema.", text_color="gray60", justify="left").grid(row=1, column=0, columnspan=2, pady=(0, 10), padx=20, sticky="w")
+        ctk.CTkLabel(g_cuda, text="Aceleração por Placa de Vídeo (NVIDIA CUDA 12)", font=ctk.CTkFont(weight="bold", size=15)).grid(row=0, column=0, columnspan=2, pady=(15, 5), padx=20, sticky="w")
+        ctk.CTkLabel(g_cuda, text="O faster-whisper requer as bibliotecas do CUDA 12 (mesmo se você possuir o CUDA 13 no sistema).\nVocê pode baixar, atualizar ou remover essas bibliotecas a qualquer momento para acelerar a transcrição.", text_color="gray70", justify="left").grid(row=1, column=0, columnspan=2, pady=(0, 10), padx=20, sticky="w")
         
         # Status das bibliotecas NVIDIA
-        self.nvidia_status_label = ctk.CTkLabel(g_cuda, text="Verificando...", text_color="gray70", justify="left")
+        self.nvidia_status_label = ctk.CTkLabel(g_cuda, text="Verificando status da GPU e bibliotecas CUDA...", text_color="gray70", justify="left")
         self.nvidia_status_label.grid(row=2, column=0, columnspan=2, pady=(0, 10), padx=20, sticky="w")
         
         # Botões de gerenciamento
         btn_frame = ctk.CTkFrame(g_cuda, fg_color="transparent")
         btn_frame.grid(row=3, column=0, columnspan=2, pady=(0, 15), padx=20, sticky="w")
         
-        self.btn_install_nvidia = ctk.CTkButton(btn_frame, text="Baixar Bibliotecas (~1.3GB)", command=self.install_nvidia_libs, width=200)
+        self.btn_install_nvidia = ctk.CTkButton(btn_frame, text="Baixar DLLs CUDA 12 (~1.3GB)", command=self.install_nvidia_libs, width=220, fg_color="#0066CC", hover_color="#005BB5")
         self.btn_install_nvidia.pack(side="left", padx=(0, 10))
         
-        self.btn_uninstall_nvidia = ctk.CTkButton(btn_frame, text="Excluir Bibliotecas", command=self.uninstall_nvidia_libs, width=150, fg_color="#8B0000", hover_color="#A52A2A")
+        self.btn_uninstall_nvidia = ctk.CTkButton(btn_frame, text="Excluir DLLs", command=self.uninstall_nvidia_libs, width=130, fg_color="#8B0000", hover_color="#A52A2A")
         self.btn_uninstall_nvidia.pack(side="left", padx=(0, 10))
         
-        ctk.CTkButton(btn_frame, text="CUDA Toolkit", command=lambda: webbrowser.open("https://developer.nvidia.com/cuda-downloads"), width=120, fg_color="#3A3A3C", hover_color="#4A4A4C").pack(side="left")
+        self.btn_refresh_nvidia = ctk.CTkButton(btn_frame, text="Verificar", command=self.update_nvidia_status, width=90, fg_color="#3A3A3C", hover_color="#4A4A4C")
+        self.btn_refresh_nvidia.pack(side="left", padx=(0, 10))
         
         # Atualiza o status das bibliotecas
         self.update_nvidia_status()
@@ -569,78 +577,76 @@ class TranscritorLocalGUI(ctk.CTk):
 
     def update_nvidia_status(self):
         """Atualiza o status das bibliotecas NVIDIA na UI."""
+        self.nvidia_status_label.configure(text="Verificando GPU e bibliotecas CUDA 12...", text_color="gray70")
+        
         def check():
             status = backend.get_nvidia_packages_status()
+            gpu_info = backend.get_gpu_info()
+            
+            gpu_text = f"✓ GPU NVIDIA detectada ({gpu_info['count']} dispositivo(s))" if gpu_info["has_gpu"] else "✗ Nenhuma GPU NVIDIA detectada"
+            
             if status.get("error"):
                 self.after(0, lambda: self.nvidia_status_label.configure(
-                    text=f"Erro: {status['error']}", text_color="orange"))
+                    text=f"{gpu_text}\nErro: {status['error']}", text_color="orange"))
                 return
             
             if status["installed"]:
-                if status.get("is_frozen"):
-                    status_text = "✓ GPU NVIDIA disponível (Aceleração CUDA ativa)"
-                else:
-                    packages_str = ", ".join([f"{p['name']} {p['version']}" for p in status["packages"]])
-                    status_text = f"✓ Instaladas: {packages_str} ({status['total_size']})"
-                
-                self.after(0, lambda: self.nvidia_status_label.configure(
-                    text=status_text,
-                    text_color="#00AA00"))
-                self.after(0, lambda: self.btn_install_nvidia.configure(state="disabled"))
-                self.after(0, lambda: self.btn_uninstall_nvidia.configure(
-                    state="normal" if not status.get("is_frozen") else "disabled"))
+                status_text = f"{gpu_text}\n✓ Bibliotecas CUDA 12 instaladas e ativas ({status['total_size']})"
+                color = "#00AA00"
+                btn_text = "Atualizar DLLs CUDA 12"
+                uninstall_state = "normal"
             else:
-                if status.get("is_frozen"):
-                    status_text = "✗ CUDA/GPU não detectada (Usando CPU com int8)"
-                else:
-                    missing = len(status.get("missing", []))
-                    status_text = f"✗ Não instaladas ({missing} pacote(s) faltando)"
-                
-                self.after(0, lambda: self.nvidia_status_label.configure(
-                    text=status_text,
-                    text_color="orange"))
-                self.after(0, lambda: self.btn_install_nvidia.configure(
-                    state="normal" if not status.get("is_frozen") else "disabled"))
-                self.after(0, lambda: self.btn_uninstall_nvidia.configure(state="disabled"))
+                status_text = f"{gpu_text}\n✗ Bibliotecas CUDA 12 não instaladas (Transcrevendo via CPU)"
+                color = "orange" if gpu_info["has_gpu"] else "gray60"
+                btn_text = "Baixar DLLs CUDA 12 (~1.3GB)"
+                uninstall_state = "disabled"
+            
+            self.after(0, lambda: self.nvidia_status_label.configure(
+                text=status_text,
+                text_color=color))
+            self.after(0, lambda: self.btn_install_nvidia.configure(state="normal", text=btn_text))
+            self.after(0, lambda: self.btn_uninstall_nvidia.configure(state=uninstall_state))
         
         threading.Thread(target=check, daemon=True).start()
 
     def install_nvidia_libs(self):
-        """Instala as bibliotecas NVIDIA."""
-        self.btn_install_nvidia.configure(state="disabled", text="Baixando...")
+        """Instala ou atualiza as bibliotecas NVIDIA CUDA 12."""
+        self.btn_install_nvidia.configure(state="disabled", text="Processando...")
+        self.btn_uninstall_nvidia.configure(state="disabled")
         
         def do_install():
             def log(msg):
-                self.after(0, lambda m=msg: self.nvidia_status_label.configure(text=m))
+                self.after(0, lambda m=msg: self.nvidia_status_label.configure(text=m, text_color="cyan"))
             
             success = backend.install_nvidia_packages(progress_callback=log)
             if success:
                 self.after(0, lambda: messagebox.showinfo("Sucesso", 
-                    "Bibliotecas NVIDIA instaladas!\nReinicie o aplicativo para usar a GPU."))
+                    "Bibliotecas NVIDIA CUDA 12 instaladas/atualizadas com sucesso!\nA aceleração por GPU já está pronta para uso."))
             else:
                 self.after(0, lambda: messagebox.showerror("Erro", 
-                    "Falha na instalação. Verifique o log para detalhes."))
+                    "Falha ao instalar bibliotecas NVIDIA. Verifique a conexão com a internet."))
             
             self.after(0, self.update_nvidia_status)
         
         threading.Thread(target=do_install, daemon=True).start()
 
     def uninstall_nvidia_libs(self):
-        """Desinstala as bibliotecas NVIDIA."""
-        if not messagebox.askyesno("Confirmar", "Tem certeza que deseja excluir as bibliotecas NVIDIA?\nVocê não poderá usar a GPU até reinstalá-las."):
+        """Desinstala as bibliotecas NVIDIA CUDA 12."""
+        if not messagebox.askyesno("Confirmar Exclusão", "Tem certeza que deseja excluir as bibliotecas NVIDIA CUDA 12?\nIsso liberará ~1.3 GB de espaço, mas as transcrições voltarão a usar a CPU."):
             return
         
+        self.btn_install_nvidia.configure(state="disabled")
         self.btn_uninstall_nvidia.configure(state="disabled", text="Excluindo...")
         
         def do_uninstall():
             def log(msg):
-                self.after(0, lambda m=msg: self.nvidia_status_label.configure(text=m))
+                self.after(0, lambda m=msg: self.nvidia_status_label.configure(text=m, text_color="yellow"))
             
             success = backend.uninstall_nvidia_packages(progress_callback=log)
             if success:
-                self.after(0, lambda: messagebox.showinfo("Sucesso", "Bibliotecas NVIDIA excluídas!"))
+                self.after(0, lambda: messagebox.showinfo("Sucesso", "Bibliotecas NVIDIA CUDA 12 excluídas com sucesso!"))
             else:
-                self.after(0, lambda: messagebox.showerror("Erro", "Falha na desinstalação."))
+                self.after(0, lambda: messagebox.showerror("Erro", "Falha ao desinstalar bibliotecas NVIDIA."))
             
             self.after(0, self.update_nvidia_status)
         
