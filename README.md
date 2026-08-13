@@ -19,19 +19,32 @@ Formatos aceitos: MP3, MP4, M4A, WAV, OGG, FLAC, AAC, WebM, MKV e MOV.
 
 ## Instalação
 
-### Pré-requisitos
+### Opção 1: Baixar o executável pronto (recomendado)
+
+Vá para a página de [Releases](https://github.com/redmagikarp13/transcritor-local-gui/releases) e baixe a versão para o seu sistema:
+
+- **Windows:** `TranscritorLocal.exe`
+- **macOS:** `TranscritorLocal-Mac.zip`
+
+Não é necessário instalar Python nem nenhuma dependência. Basta baixar e executar!
+
+> **Nota para Windows:** Se quiser usar aceleração por GPU NVIDIA, instale o [CUDA Toolkit 12](https://developer.nvidia.com/cuda-downloads) antes de executar o programa.
+
+### Opção 2: Instalar a partir do código-fonte
+
+#### Pré-requisitos
 
 - Python 3.10 ou superior
 - (Opcional) GPU NVIDIA com CUDA Toolkit 12 para aceleração por GPU
 
-### 1. Clone o repositório
+#### 1. Clone o repositório
 
 ```powershell
 git clone https://github.com/redmagikarp13/transcritor-local-gui.git
 cd transcritor-local-gui
 ```
 
-### 2. Crie e ative o ambiente virtual
+#### 2. Crie e ative o ambiente virtual
 
 No Windows/PowerShell:
 
@@ -53,7 +66,7 @@ pip install -r src/transcritor/core/requirements.txt
 pip install -r gui_requirements.txt
 ```
 
-### 3. Inicie a interface gráfica
+#### 3. Inicie a interface gráfica
 
 No Windows:
 
