@@ -219,9 +219,27 @@ class TranscritorLocalGUI(ctk.CTk):
 
         # Grupo CUDA
         g_cuda = self.create_group(self.frames["settings"], 2)
-        ctk.CTkLabel(g_cuda, text="Aceleração por Placa de Vídeo (NVIDIA)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, pady=(15, 5), padx=20, sticky="w")
-        ctk.CTkLabel(g_cuda, text="Para usar a GPU, você precisa ter o CUDA Toolkit 12 instalado no Windows.\nO programa usará a CPU automaticamente se as bibliotecas não forem encontradas.", text_color="gray60", justify="left").grid(row=1, column=0, pady=(0, 15), padx=20, sticky="w")
-        ctk.CTkButton(g_cuda, text="Baixar CUDA Toolkit", command=lambda: webbrowser.open("https://developer.nvidia.com/cuda-downloads"), fg_color="#3A3A3C", hover_color="#4A4A4C").grid(row=1, column=1, padx=20, pady=(0,15), sticky="e")
+        ctk.CTkLabel(g_cuda, text="Aceleração por Placa de Vídeo (NVIDIA)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=2, pady=(15, 5), padx=20, sticky="w")
+        ctk.CTkLabel(g_cuda, text="Para usar a GPU, você precisa das bibliotecas NVIDIA CUDA 12.\nFunciona com qualquer versão do CUDA Toolkit instalada no sistema.", text_color="gray60", justify="left").grid(row=1, column=0, columnspan=2, pady=(0, 10), padx=20, sticky="w")
+        
+        # Status das bibliotecas NVIDIA
+        self.nvidia_status_label = ctk.CTkLabel(g_cuda, text="Verificando...", text_color="gray70", justify="left")
+        self.nvidia_status_label.grid(row=2, column=0, columnspan=2, pady=(0, 10), padx=20, sticky="w")
+        
+        # Botões de gerenciamento
+        btn_frame = ctk.CTkFrame(g_cuda, fg_color="transparent")
+        btn_frame.grid(row=3, column=0, columnspan=2, pady=(0, 15), padx=20, sticky="w")
+        
+        self.btn_install_nvidia = ctk.CTkButton(btn_frame, text="Baixar Bibliotecas (~1.3GB)", command=self.install_nvidia_libs, width=200)
+        self.btn_install_nvidia.pack(side="left", padx=(0, 10))
+        
+        self.btn_uninstall_nvidia = ctk.CTkButton(btn_frame, text="Excluir Bibliotecas", command=self.uninstall_nvidia_libs, width=150, fg_color="#8B0000", hover_color="#A52A2A")
+        self.btn_uninstall_nvidia.pack(side="left", padx=(0, 10))
+        
+        ctk.CTkButton(btn_frame, text="CUDA Toolkit", command=lambda: webbrowser.open("https://developer.nvidia.com/cuda-downloads"), width=120, fg_color="#3A3A3C", hover_color="#4A4A4C").pack(side="left")
+        
+        # Atualiza o status das bibliotecas
+        self.update_nvidia_status()
 
         ctk.CTkButton(self.frames["settings"], text="Salvar Configurações", command=self.save_settings, width=150, height=35, fg_color="#0066CC", hover_color="#005BB5").grid(row=3, column=0, pady=20, padx=20, sticky="sw")
 
@@ -539,6 +557,73 @@ class TranscritorLocalGUI(ctk.CTk):
             messagebox.showinfo("Sucesso", "Configurações salvas!")
         except Exception as e:
             messagebox.showerror("Erro", f"Erro: {e}")
+
+    def update_nvidia_status(self):
+        """Atualiza o status das bibliotecas NVIDIA na UI."""
+        def check():
+            status = backend.get_nvidia_packages_status()
+            if status.get("error"):
+                self.after(0, lambda: self.nvidia_status_label.configure(
+                    text=f"Erro: {status['error']}", text_color="orange"))
+                return
+            
+            if status["installed"]:
+                packages_str = ", ".join([f"{p['name']} {p['version']}" for p in status["packages"]])
+                self.after(0, lambda: self.nvidia_status_label.configure(
+                    text=f"✓ Instaladas: {packages_str} ({status['total_size']})",
+                    text_color="#00AA00"))
+                self.after(0, lambda: self.btn_install_nvidia.configure(state="disabled"))
+                self.after(0, lambda: self.btn_uninstall_nvidia.configure(state="normal"))
+            else:
+                missing = len(status.get("missing", []))
+                self.after(0, lambda: self.nvidia_status_label.configure(
+                    text=f"✗ Não instaladas ({missing} pacote(s) faltando)",
+                    text_color="orange"))
+                self.after(0, lambda: self.btn_install_nvidia.configure(state="normal"))
+                self.after(0, lambda: self.btn_uninstall_nvidia.configure(state="disabled"))
+        
+        threading.Thread(target=check, daemon=True).start()
+
+    def install_nvidia_libs(self):
+        """Instala as bibliotecas NVIDIA."""
+        self.btn_install_nvidia.configure(state="disabled", text="Baixando...")
+        
+        def do_install():
+            def log(msg):
+                self.after(0, lambda m=msg: self.nvidia_status_label.configure(text=m))
+            
+            success = backend.install_nvidia_packages(progress_callback=log)
+            if success:
+                self.after(0, lambda: messagebox.showinfo("Sucesso", 
+                    "Bibliotecas NVIDIA instaladas!\nReinicie o aplicativo para usar a GPU."))
+            else:
+                self.after(0, lambda: messagebox.showerror("Erro", 
+                    "Falha na instalação. Verifique o log para detalhes."))
+            
+            self.after(0, self.update_nvidia_status)
+        
+        threading.Thread(target=do_install, daemon=True).start()
+
+    def uninstall_nvidia_libs(self):
+        """Desinstala as bibliotecas NVIDIA."""
+        if not messagebox.askyesno("Confirmar", "Tem certeza que deseja excluir as bibliotecas NVIDIA?\nVocê não poderá usar a GPU até reinstalá-las."):
+            return
+        
+        self.btn_uninstall_nvidia.configure(state="disabled", text="Excluindo...")
+        
+        def do_uninstall():
+            def log(msg):
+                self.after(0, lambda m=msg: self.nvidia_status_label.configure(text=m))
+            
+            success = backend.uninstall_nvidia_packages(progress_callback=log)
+            if success:
+                self.after(0, lambda: messagebox.showinfo("Sucesso", "Bibliotecas NVIDIA excluídas!"))
+            else:
+                self.after(0, lambda: messagebox.showerror("Erro", "Falha na desinstalação."))
+            
+            self.after(0, self.update_nvidia_status)
+        
+        threading.Thread(target=do_uninstall, daemon=True).start()
 
 if __name__ == "__main__":
     app = TranscritorLocalGUI()

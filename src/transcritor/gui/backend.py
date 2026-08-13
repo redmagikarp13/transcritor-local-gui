@@ -1,5 +1,7 @@
 import os
 import sys
+import subprocess
+import shutil
 from pathlib import Path
 from huggingface_hub import scan_cache_dir, hf_hub_url
 from huggingface_hub.file_download import repo_folder_name
@@ -12,6 +14,13 @@ MODELS = ["tiny", "base", "small", "medium", "large-v3"]
 
 # Organização no HuggingFace que hospeda os modelos faster-whisper
 _FW_ORG = "Systran"
+
+# Bibliotecas NVIDIA necessárias para GPU
+NVIDIA_PACKAGES = [
+    "nvidia-cublas-cu12",
+    "nvidia-cudnn-cu12==9.*",
+    "nvidia-cuda-nvrtc-cu12",
+]
 
 def get_repo_id(model_size: str) -> str:
     """Retorna o repo_id do HuggingFace para o modelo faster-whisper."""
@@ -62,4 +71,126 @@ def delete_model(model_size: str) -> bool:
         return False
     except Exception as e:
         print(f"Erro ao excluir modelo: {e}")
+        return False
+
+
+# --- Gerenciamento de Bibliotecas NVIDIA ---
+
+def get_nvidia_packages_status() -> dict:
+    """Retorna o status das bibliotecas NVIDIA instaladas."""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "list", "--format=json"],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode != 0:
+            return {"installed": False, "packages": [], "error": "Erro ao consultar pip"}
+        
+        import json
+        installed_packages = json.loads(result.stdout)
+        nvidia_installed = []
+        nvidia_missing = []
+        
+        for pkg in NVIDIA_PACKAGES:
+            pkg_name = pkg.split("==")[0].replace("*", "")
+            found = False
+            for installed in installed_packages:
+                if installed["name"].lower().startswith(pkg_name.lower().replace("-", "")):
+                    nvidia_installed.append({
+                        "name": installed["name"],
+                        "version": installed["version"]
+                    })
+                    found = True
+                    break
+            if not found:
+                nvidia_missing.append(pkg)
+        
+        return {
+            "installed": len(nvidia_missing) == 0,
+            "packages": nvidia_installed,
+            "missing": nvidia_missing,
+            "total_size": _estimate_nvidia_size(nvidia_installed)
+        }
+    except Exception as e:
+        return {"installed": False, "packages": [], "error": str(e)}
+
+def _estimate_nvidia_size(packages: list) -> str:
+    """Estima o tamanho total das bibliotecas NVIDIA instaladas."""
+    # Tamanhos aproximados das wheels
+    sizes = {
+        "nvidia-cublas-cu12": 553,
+        "nvidia-cudnn-cu12": 737,
+        "nvidia-cuda-nvrtc-cu12": 76,
+    }
+    total_mb = 0
+    for pkg in packages:
+        for key, size in sizes.items():
+            if key in pkg["name"].lower():
+                total_mb += size
+                break
+    if total_mb == 0:
+        return "0 MB"
+    return f"~{total_mb} MB"
+
+def install_nvidia_packages(progress_callback=None) -> bool:
+    """Instala as bibliotecas NVIDIA necessárias para GPU."""
+    if progress_callback:
+        progress_callback("Iniciando instalação das bibliotecas NVIDIA CUDA 12...")
+        progress_callback("Isso pode demorar alguns minutos (~1.3 GB)...")
+    
+    try:
+        packages_str = " ".join(NVIDIA_PACKAGES)
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install"] + NVIDIA_PACKAGES,
+            capture_output=True, text=True, timeout=600
+        )
+        
+        if result.returncode == 0:
+            if progress_callback:
+                progress_callback("Bibliotecas NVIDIA instaladas com sucesso!")
+                progress_callback("Reinicie o aplicativo para usar a GPU.")
+            return True
+        else:
+            if progress_callback:
+                progress_callback(f"Erro na instalação: {result.stderr}")
+            return False
+    except subprocess.TimeoutExpired:
+        if progress_callback:
+            progress_callback("Timeout na instalação. Tente novamente.")
+        return False
+    except Exception as e:
+        if progress_callback:
+            progress_callback(f"Erro: {e}")
+        return False
+
+def uninstall_nvidia_packages(progress_callback=None) -> bool:
+    """Desinstala as bibliotecas NVIDIA."""
+    if progress_callback:
+        progress_callback("Desinstalando bibliotecas NVIDIA...")
+    
+    try:
+        # Obtém lista de pacotes nvidia instalados
+        status = get_nvidia_packages_status()
+        if not status["packages"]:
+            if progress_callback:
+                progress_callback("Nenhuma biblioteca NVIDIA encontrada.")
+            return True
+        
+        packages_to_remove = [p["name"] for p in status["packages"]]
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "uninstall", "-y"] + packages_to_remove,
+            capture_output=True, text=True, timeout=120
+        )
+        
+        if result.returncode == 0:
+            if progress_callback:
+                progress_callback("Bibliotecas NVIDIA desinstaladas com sucesso!")
+            return True
+        else:
+            if progress_callback:
+                progress_callback(f"Erro na desinstalação: {result.stderr}")
+            return False
+    except Exception as e:
+        if progress_callback:
+            progress_callback(f"Erro: {e}")
         return False
