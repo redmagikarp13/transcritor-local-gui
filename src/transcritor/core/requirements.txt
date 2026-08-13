@@ -12,17 +12,16 @@ customtkinter
 whisper-ctranslate2
 
 # --- Bibliotecas NVIDIA (CUDA) -------------------------------------------------
-# Se você já tem o CUDA Toolkit 12 instalado no sistema, NÃO precisa instalar nada!
-# O programa detecta automaticamente as DLLs em:
-#   - CUDA_PATH (variável de ambiente)
-#   - C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\*
-#   - PATH do sistema
+# O faster-whisper precisa de CUDA 12. Se você tem CUDA 13 (ou outro) instalado,
+# instale as bibliotecas pip abaixo que contêm CUDA 12 e funcionam junto:
 #
-# Se NÃO tem o CUDA instalado, você pode instalar via pip (apenas para desenvolvimento):
 #   pip install nvidia-cublas-cu12 "nvidia-cudnn-cu12==9.*"
 #
-# Para o executável compilado, o CUDA Toolkit deve estar instalado no sistema.
-# Baixe em: https://developer.nvidia.com/cuda-downloads
+# O programa detecta automaticamente e usa as bibliotecas pip em vez do CUDA do sistema.
+# Não precisa fazer downgrade do CUDA instalado!
+#
+# Se você já tem CUDA 12 instalado no sistema, o programa também detecta automaticamente.
+# Baixe o CUDA Toolkit em: https://developer.nvidia.com/cuda-downloads
 #
 # --- Diarizacao opcional (quem falou) ------------------------------------------
 # Desligada por padrao. So se for separar falantes (puxa PyTorch, ~1-2 GB a mais):
